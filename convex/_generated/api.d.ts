@@ -8,9 +8,10 @@
  * @module
  */
 
+import type * as cropPhotos from "../cropPhotos.js";
+import type * as crops from "../crops.js";
+import type * as farms from "../farms.js";
 import type * as http from "../http.js";
-import type * as messages from "../messages.js";
-import type * as tasks from "../tasks.js";
 import type * as users from "../users.js";
 
 import type {
@@ -20,9 +21,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  cropPhotos: typeof cropPhotos;
+  crops: typeof crops;
+  farms: typeof farms;
   http: typeof http;
-  messages: typeof messages;
-  tasks: typeof tasks;
   users: typeof users;
 }>;
 

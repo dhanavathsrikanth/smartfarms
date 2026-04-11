@@ -1,14 +1,15 @@
-import { AuthConfig } from "convex/server";
+// We sanitize the domain to ensure no duplicate protocol prefixes or trailing slashes
+// which can cause "No auth provider found" errors in Convex.
+// The domain must match the 'iss' claim in your Clerk JWT template.
+const rawDomain = process.env.CLERK_FRONTEND_API_URL || "";
+const cleanDomain = rawDomain.replace(/^(https?:\/\/|\/\/)/, "").replace(/\/+$/, "");
+const issuerDomain = `https://${cleanDomain}`;
 
 export default {
   providers: [
     {
-      // Replace with your Clerk Frontend API URL
-      // or with `process.env.CLERK_JWT_ISSUER_DOMAIN`
-      // and configure CLERK_JWT_ISSUER_DOMAIN on the Convex Dashboard
-      // See https://docs.convex.dev/auth/clerk#configuring-dev-and-prod-instances
-      domain: process.env.CLERK_JWT_ISSUER_DOMAIN!,
+      domain: issuerDomain,
       applicationID: "convex",
     },
-  ]
-} satisfies AuthConfig;
+  ],
+};

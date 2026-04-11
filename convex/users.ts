@@ -2,6 +2,9 @@ import { internalMutation, mutation, query, QueryCtx } from "./_generated/server
 import { UserJSON } from "@clerk/backend";
 import { v, Validator } from "convex/values";
 
+/**
+ * Current User Query
+ */
 export const current = query({
   args: {},
   handler: async (ctx) => {
@@ -9,6 +12,9 @@ export const current = query({
   },
 });
 
+/**
+ * Client-side Storage Mutation
+ */
 export const store = mutation({
   args: {},
   handler: async (ctx) => {
@@ -20,10 +26,12 @@ export const store = mutation({
     // Check if we've already stored this identity before.
     const user = await ctx.db
       .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      .withIndex("byExternalId", (q) =>
+        q.eq("externalId", identity.subject),
       )
       .unique();
+
+    const publicMetadata = identity.publicMetadata as any;
 
     const userProps = {
       name: identity.name ?? "Anonymous",
@@ -34,6 +42,9 @@ export const store = mutation({
       lastName: identity.familyName,
       imageUrl: identity.pictureUrl,
       username: identity.nickname,
+      // Comprehensive Timestamps & Metadata
+      publicMetadata: publicMetadata,
+      role: publicMetadata?.role ?? undefined,
     };
 
     if (user !== null) {
@@ -45,6 +56,9 @@ export const store = mutation({
   },
 });
 
+/**
+ * Webhook Upsert Mutation
+ */
 export const upsertFromClerk = internalMutation({
   args: { data: v.any() as Validator<UserJSON> },
   async handler(ctx, { data }) {
@@ -52,21 +66,31 @@ export const upsertFromClerk = internalMutation({
       (e: any) => e.id === data.primary_email_address_id
     )?.email_address ?? data.email_addresses[0]?.email_address ?? "";
 
+    const payload = data as any;
     const userProps = {
-      name: `${data.first_name || ""} ${data.last_name || ""}`.trim() || "Anonymous",
+      name: `${payload.first_name || ""} ${payload.last_name || ""}`.trim() || "Anonymous",
       email: primaryEmail,
-      externalId: data.id,
-      firstName: data.first_name ?? undefined,
-      lastName: data.last_name ?? undefined,
-      imageUrl: data.image_url ?? undefined,
-      username: data.username ?? undefined,
+      externalId: payload.id,
+      firstName: payload.first_name ?? undefined,
+      lastName: payload.last_name ?? undefined,
+      imageUrl: payload.image_url ?? undefined,
+      username: payload.username ?? undefined,
+      // Comprehensive Timestamps & Metadata
+      createdAt: payload.created_at ?? undefined,
+      lastSignInAt: payload.last_sign_in_at ?? undefined,
+      publicMetadata: payload.public_metadata ?? undefined,
+      birthday: payload.birthday ?? undefined,
+      gender: payload.gender ?? undefined,
+      // Promote 'role' from public metadata to a first-class field
+      role: payload.public_metadata?.role ?? undefined,
     };
 
     const user = await userByExternalId(ctx, data.id);
+    
     if (user === null) {
       await ctx.db.insert("users", {
         ...userProps,
-        tokenIdentifier: data.id, // Placeholder
+        tokenIdentifier: data.id, 
       });
     } else {
       await ctx.db.patch(user._id, userProps);
@@ -74,6 +98,9 @@ export const upsertFromClerk = internalMutation({
   },
 });
 
+/**
+ * Webhook Delete Mutation
+ */
 export const deleteFromClerk = internalMutation({
   args: { clerkUserId: v.string() },
   async handler(ctx, { clerkUserId }) {
@@ -89,12 +116,18 @@ export const deleteFromClerk = internalMutation({
   },
 });
 
+/**
+ * Helper: Get Current User or Throw
+ */
 export async function getCurrentUserOrThrow(ctx: QueryCtx) {
   const userRecord = await getCurrentUser(ctx);
   if (!userRecord) throw new Error("Can't get current user");
   return userRecord;
 }
 
+/**
+ * Helper: Get Current User Detail
+ */
 export async function getCurrentUser(ctx: QueryCtx) {
   const identity = await ctx.auth.getUserIdentity();
   if (identity === null) {
@@ -103,6 +136,9 @@ export async function getCurrentUser(ctx: QueryCtx) {
   return await userByExternalId(ctx, identity.subject);
 }
 
+/**
+ * Helper: Query Database by Clerk External ID
+ */
 async function userByExternalId(ctx: QueryCtx, externalId: string) {
   return await ctx.db
     .query("users")
