@@ -120,14 +120,14 @@ export function CropTimeline({ cropId }: CropTimelineProps) {
                       </p>
                       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                         <Calendar className="h-3 w-3" />
-                        {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {date.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
                       </div>
                     </div>
                     
-                    {event.amount !== undefined && (
+                    {("amount" in event) && (
                       <div className="text-right shrink-0">
                         <p className={`text-sm font-bold ${event.type === 'sale' ? 'text-emerald-700' : 'text-red-700'}`}>
-                          {event.type === 'sale' ? '+' : '-'}{formatINR(event.amount)}
+                          {event.type === 'sale' ? '+' : '-'}{formatINR((event as { amount: number }).amount)}
                         </p>
                         <p className="text-[9px] uppercase font-bold text-muted-foreground">Total</p>
                       </div>

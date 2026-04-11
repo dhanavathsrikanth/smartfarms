@@ -137,15 +137,16 @@ export const markAsHarvested = mutation({
   args: {
     cropId: v.id("crops"),
     actualHarvestDate: v.string(),
+    notes: v.optional(v.string()),
   },
-  handler: async (ctx, { cropId, actualHarvestDate }) => {
+  handler: async (ctx, { cropId, actualHarvestDate, notes }) => {
     const userId = await getAuthenticatedUserId(ctx);
     await verifyCropOwnership(ctx, cropId, userId);
 
-    await ctx.db.patch(cropId, {
-      status: "harvested",
-      actualHarvestDate,
-    });
+    const patch: Record<string, unknown> = { status: "harvested", actualHarvestDate };
+    if (notes) patch.notes = notes;
+
+    await ctx.db.patch(cropId, patch);
   },
 });
 

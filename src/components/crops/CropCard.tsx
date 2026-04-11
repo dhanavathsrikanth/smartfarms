@@ -124,7 +124,7 @@ export function CropCard({ crop, onEdit, onMarkHarvested }: CropCardProps) {
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(crop); }}>
                 <Pencil className="mr-2 h-4 w-4" /> Edit Details
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleArchive} disabled={crop.status === "archived"}>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleArchive(e); }} disabled={crop.status === "archived"}>
                 <Archive className="mr-2 h-4 w-4" /> Archive Cycle
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -205,7 +205,16 @@ export function CropCard({ crop, onEdit, onMarkHarvested }: CropCardProps) {
         </div>
       </CardContent>
 
-      <CardFooter className="p-4 pt-0 gap-2">
+      <CardFooter className="p-4 pt-0 gap-2 flex-wrap">
+        <Button 
+          variant="outline" 
+          size="sm"
+          className="h-9 gap-2 border-muted-foreground/20"
+          onClick={(e) => { e.stopPropagation(); onEdit?.(crop); }}
+        >
+          <Pencil className="h-4 w-4" />
+          Edit
+        </Button>
         {crop.status === "active" && (
           <Button 
             className="flex-1 btn-primary-branding h-9 gap-2"
@@ -218,7 +227,7 @@ export function CropCard({ crop, onEdit, onMarkHarvested }: CropCardProps) {
         <Button 
           variant="outline" 
           className="flex-1 h-9 gap-2 group-hover:bg-secondary/5 transition-colors"
-          onClick={navigateToDetail}
+          onClick={(e) => { e.stopPropagation(); navigateToDetail(); }}
         >
           Details
           <ArrowRight className="h-4 w-4" />

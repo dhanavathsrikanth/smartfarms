@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CreateFarmDialog } from "@/components/farms/CreateFarmDialog";
 import { CreateCropDialog } from "@/components/crops/CreateCropDialog";
+import { 
   Sprout,
   TreePine,
   ArrowRight,
@@ -469,4 +470,12 @@ function SkeletonRow() {
   );
 }
 
+function seasonColor(season: "kharif" | "rabi" | "zaid" | "annual"): string {
+  const map: Record<string, string> = {
+    kharif: "bg-blue-500",
+    rabi: "bg-orange-500",
+    zaid: "bg-purple-500",
+    annual: "bg-slate-400",
+  };
+  return map[season] ?? "bg-slate-400";
 }

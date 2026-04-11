@@ -12,20 +12,29 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Camera, 
   Trash2, 
   Calendar, 
-  Maximize2, 
   Plus, 
   History,
   Sprout
 } from "lucide-react";
 import { CropPhotoUploader } from "./CropPhotoUploader";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton";
 
 interface CropPhotoDiaryProps {
   cropId: Id<"crops">;
@@ -36,17 +45,21 @@ export function CropPhotoDiary({ cropId }: CropPhotoDiaryProps) {
   const deletePhoto = useMutation(api.cropPhotos.deletePhoto);
   
   const [selectedPhoto, setSelectedPhoto] = useState<CropPhoto | null>(null);
+  const [photoToDelete, setPhotoToDelete] = useState<Id<"cropPhotos"> | null>(null);
   const [isUploaderOpen, setIsUploaderOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDelete = async (e: React.MouseEvent, photoId: Id<"cropPhotos">) => {
-    e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this photo?")) return;
-    
+  const handleDelete = async () => {
+    if (!photoToDelete) return;
+    setIsDeleting(true);
     try {
-      await deletePhoto({ photoId });
+      await deletePhoto({ photoId: photoToDelete });
       toast.success("Photo removed from diary.");
-    } catch (err) {
+      setPhotoToDelete(null);
+    } catch {
       toast.error("Failed to delete photo.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -73,7 +86,7 @@ export function CropPhotoDiary({ cropId }: CropPhotoDiaryProps) {
           onClick={() => setIsUploaderOpen(true)}
         >
           <Camera className="h-4 w-4" />
-          Add Log
+          Add Photo
         </Button>
       </div>
 
@@ -82,7 +95,7 @@ export function CropPhotoDiary({ cropId }: CropPhotoDiaryProps) {
           <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
             <Camera className="h-6 w-6 text-muted-foreground" />
           </div>
-          <p className="font-semibold">Document your growth</p>
+          <p className="font-semibold">Document your crop&apos;s growth journey</p>
           <p className="text-xs text-muted-foreground mt-1 text-center max-w-[200px]">
             Take photos of your crop at different stages to track its health and progress.
           </p>
@@ -95,22 +108,22 @@ export function CropPhotoDiary({ cropId }: CropPhotoDiaryProps) {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="columns-2 lg:columns-3 gap-4 space-y-4">
           {photos.map((photo) => (
             <div 
               key={photo._id} 
-              className="group relative rounded-xl overflow-hidden border bg-card hover:shadow-md transition-shadow cursor-pointer"
+              className="group relative rounded-xl overflow-hidden border bg-card hover:shadow-md transition-shadow cursor-pointer break-inside-avoid mb-4"
               onClick={() => setSelectedPhoto(photo)}
             >
-              <div className="aspect-[4/3] bg-muted overflow-hidden">
+              <div className="bg-muted overflow-hidden">
                 <img 
                   src={photo.photoUrl} 
                   alt={photo.caption || "Growth Photo"} 
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               </div>
 
-              {/* Badges & Overlay */}
+              {/* Stage & Date Badges */}
               <div className="absolute top-2 left-2 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 {photo.cropStage && (
                   <Badge className="bg-white/90 text-foreground border-none text-[10px] uppercase font-bold backdrop-blur-sm self-start">
@@ -123,12 +136,13 @@ export function CropPhotoDiary({ cropId }: CropPhotoDiaryProps) {
                 </Badge>
               </div>
 
+              {/* Delete Button */}
               <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button 
                   variant="destructive" 
                   size="icon" 
                   className="h-8 w-8 rounded-full"
-                  onClick={(e) => handleDelete(e, photo._id)}
+                  onClick={(e) => { e.stopPropagation(); setPhotoToDelete(photo._id); }}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -166,11 +180,13 @@ export function CropPhotoDiary({ cropId }: CropPhotoDiaryProps) {
           </DialogHeader>
           
           <div className="flex items-center justify-center p-2 min-h-[400px] max-h-[80vh]">
-            <img 
-              src={selectedPhoto?.photoUrl} 
-              alt="Viewing photo" 
-              className="max-h-full max-w-full object-contain"
-            />
+            {selectedPhoto && (
+              <img 
+                src={selectedPhoto.photoUrl} 
+                alt="Viewing photo" 
+                className="max-h-full max-w-full object-contain"
+              />
+            )}
           </div>
 
           <div className="p-4 bg-muted/10 border-t border-white/5 flex justify-between items-center text-xs">
@@ -179,11 +195,36 @@ export function CropPhotoDiary({ cropId }: CropPhotoDiaryProps) {
               <span className="text-slate-400">Uploaded: {selectedPhoto ? new Date(selectedPhoto.createdAt).toLocaleDateString() : ""}</span>
             </div>
             <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white" onClick={() => setSelectedPhoto(null)}>
-              Close Zoom
+              Close
             </Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation AlertDialog */}
+      <AlertDialog open={!!photoToDelete} onOpenChange={(o) => { if (!o) setPhotoToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Delete Photo?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this photo from the growth diary. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleDelete(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Delete Photo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Uploader Dialog */}
       <CropPhotoUploader 

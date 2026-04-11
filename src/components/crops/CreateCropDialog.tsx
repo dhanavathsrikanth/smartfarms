@@ -146,7 +146,7 @@ export function CreateCropDialog({ open, onOpenChange, farmId }: CreateCropDialo
         <Label>Farm <span className="text-destructive">*</span></Label>
         <Select 
           value={form.farmId} 
-          onValueChange={(v) => setField("farmId", v)}
+          onValueChange={(v) => v !== null && setField("farmId", v)}
           disabled={!!farmId || loading}
         >
           <SelectTrigger className={errors.farmId ? "border-destructive" : ""}>
@@ -154,7 +154,7 @@ export function CreateCropDialog({ open, onOpenChange, farmId }: CreateCropDialo
           </SelectTrigger>
           <SelectContent>
             {farms?.map((f) => (
-              <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>
+              <SelectItem key={f._id} value={f._id as string}>{f.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -165,12 +165,12 @@ export function CreateCropDialog({ open, onOpenChange, farmId }: CreateCropDialo
         {/* Crop Name */}
         <div className="space-y-1.5">
           <Label>Crop Name <span className="text-destructive">*</span></Label>
-          <Select value={form.name} onValueChange={(v) => setField("name", v)}>
+          <Select value={form.name} onValueChange={(v) => v !== null && setField("name", v)}>
             <SelectTrigger className={errors.name ? "border-destructive" : ""}>
               <SelectValue placeholder="Select or type..." />
             </SelectTrigger>
             <SelectContent>
-              {CROP_SUGGESTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {CROP_SUGGESTIONS.map(s => <SelectItem key={s} value={s as string}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
           {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}

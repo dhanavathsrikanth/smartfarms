@@ -5,7 +5,9 @@ import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { CropWithStats } from "@/types/crop";
 import { CropCard } from "./CropCard";
-import { useState, useMemo } from "react";
+import { EditCropDialog } from "./EditCropDialog";
+import { MarkHarvestedDialog } from "./MarkHarvestedDialog";
+import { useState, useMemo, useEffect } from "react";
 import { 
   Plus, 
   Search, 
@@ -43,20 +45,15 @@ export function CropGrid({ farmId, onAddClick }: CropGridProps) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // Simple debounce logic
-  useState(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 300);
-    return () => clearTimeout(timer);
-  });
-  
-  // Use useEffect for the actual debounce
-  useMemo(() => {
+  // Dialog state
+  const [editCrop, setEditCrop] = useState<CropWithStats | null>(null);
+  const [harvestCrop, setHarvestCrop] = useState<CropWithStats | null>(null);
+
+  // Debounce search input
+  useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search);
     }, 300);
-
     return () => clearTimeout(handler);
   }, [search]);
 
@@ -76,11 +73,11 @@ export function CropGrid({ farmId, onAddClick }: CropGridProps) {
       result = result.filter(c => 
         c.name.toLowerCase().includes(query) || 
         c.variety?.toLowerCase().includes(query) ||
-        c.farmName?.toLowerCase().includes(query)
+        (c as CropWithStats & { farmName?: string }).farmName?.toLowerCase().includes(query)
       );
     }
 
-    // Filter
+    // Filter by status
     if (filter !== "all") {
       result = result.filter(c => c.status === filter);
     }
@@ -99,12 +96,22 @@ export function CropGrid({ farmId, onAddClick }: CropGridProps) {
     return result;
   }, [cropsResult, filter, sort, debouncedSearch]);
 
+  const getEmptyMessage = () => {
+    if (search) return { title: "No results found", desc: "Try adjusting your search query." };
+    switch (filter) {
+      case "active": return { title: "No active crops", desc: "Add your first crop to start tracking!", showAdd: true };
+      case "harvested": return { title: "No harvested crops yet", desc: "Mark active crops as harvested to see them here." };
+      case "failed": return { title: "No failed crops recorded", desc: "Failed crops will appear here once marked." };
+      default: return { title: "No crops found", desc: "Register a farm and log your first crop cycle to start tracking growth and profits.", showAdd: true };
+    }
+  };
+
   if (cropsResult === undefined) {
     return (
       <div className="space-y-6">
         <div className="h-10 w-full bg-muted animate-pulse rounded-md" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+          {[1, 2, 3].map((i) => (
             <div key={i} className="h-64 rounded-xl border border-border bg-card/50 flex flex-col p-4 space-y-4">
               <Skeleton className="h-8 w-3/4" />
               <Skeleton className="h-4 w-1/2" />
@@ -118,6 +125,8 @@ export function CropGrid({ farmId, onAddClick }: CropGridProps) {
       </div>
     );
   }
+
+  const emptyMeta = getEmptyMessage();
 
   return (
     <div className="space-y-6">
@@ -172,7 +181,7 @@ export function CropGrid({ farmId, onAddClick }: CropGridProps) {
               <DropdownMenuLabel>Sort Options</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setSort("newest")}>Newest Sowed</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSort("oldest")}>Oldest records</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSort("oldest")}>Oldest Records</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setSort("profitable")}>Most Profitable</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setSort("expensive")}>Highest Costs</DropdownMenuItem>
             </DropdownMenuContent>
@@ -197,11 +206,9 @@ export function CropGrid({ farmId, onAddClick }: CropGridProps) {
           <div className="h-16 w-16 items-center justify-center rounded-2xl bg-muted flex mb-4">
             <LayoutGrid className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-bold">No crops found</h3>
-          <p className="text-muted-foreground text-sm max-w-xs mt-1">
-            {search ? "Try adjusting your search query." : "Register a farm and log your first crop cycle to start tracking growth and profits."}
-          </p>
-          {onAddClick && !search && (
+          <h3 className="text-lg font-bold">{emptyMeta.title}</h3>
+          <p className="text-muted-foreground text-sm max-w-xs mt-1">{emptyMeta.desc}</p>
+          {onAddClick && "showAdd" in emptyMeta && emptyMeta.showAdd && (
             <Button className="mt-6 btn-primary-branding gap-2" onClick={onAddClick}>
               <Plus className="h-4 w-4" />
               Log Your First Crop
@@ -214,9 +221,8 @@ export function CropGrid({ farmId, onAddClick }: CropGridProps) {
             <CropCard 
               key={crop._id} 
               crop={crop} 
-              // These will be wired to state in the parent page/container
-              onEdit={() => console.log("Edit", crop._id)}
-              onMarkHarvested={() => console.log("Harvest", crop._id)}
+              onEdit={(c) => setEditCrop(c)}
+              onMarkHarvested={(c) => setHarvestCrop(c)}
             />
           ))}
         </div>
@@ -231,6 +237,18 @@ export function CropGrid({ farmId, onAddClick }: CropGridProps) {
           <Plus className="h-6 w-6" />
         </Button>
       )}
+
+      {/* Wired Dialogs */}
+      <EditCropDialog
+        crop={editCrop}
+        open={!!editCrop}
+        onOpenChange={(open) => { if (!open) setEditCrop(null); }}
+      />
+      <MarkHarvestedDialog
+        crop={harvestCrop}
+        open={!!harvestCrop}
+        onOpenChange={(open) => { if (!open) setHarvestCrop(null); }}
+      />
     </div>
   );
 }
