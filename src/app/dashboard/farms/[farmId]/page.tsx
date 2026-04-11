@@ -44,10 +44,24 @@ import {
   Users,
   AlertTriangle,
   ChevronRight,
-  Plus
+  Plus,
+  Receipt,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import {
+  ExpenseList,
+  ExpenseSummaryCard,
+  ExpenseCategoryChart,
+} from "@/app/components/expenses";
+import { AddExpenseForm } from "@/app/components/expenses/AddExpenseForm";
+import { BulkExpenseDialog } from "@/app/components/expenses/BulkExpenseDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function FarmDetailPage() {
   useStoreUserEffect();
@@ -78,6 +92,10 @@ function FarmDetailContent({ farmId }: { farmId: Id<"farms"> }) {
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [createCropOpen, setCreateCropOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [addExpenseOpen, setAddExpenseOpen] = useState(false);
+  const [bulkExpenseOpen, setBulkExpenseOpen] = useState(false);
+
+  const expenseSummary = useQuery(api.expenses.getExpenseSummaryByFarm, { farmId });
 
   const handleArchive = async () => {
     setArchiving(true);
@@ -280,6 +298,9 @@ function FarmDetailContent({ farmId }: { farmId: Id<"farms"> }) {
           <TabsTrigger value="crops" className="gap-1.5">
             <Sprout className="h-4 w-4" /> Crops
           </TabsTrigger>
+          <TabsTrigger value="expenses" className="gap-1.5">
+            <Receipt className="h-4 w-4" /> Expenses
+          </TabsTrigger>
           <TabsTrigger value="soil" className="gap-1.5">
             <FlaskConical className="h-4 w-4" /> Soil Tests
           </TabsTrigger>
@@ -309,6 +330,62 @@ function FarmDetailContent({ farmId }: { farmId: Id<"farms"> }) {
             
             <CropGrid farmId={farmId} onAddClick={() => setCreateCropOpen(true)} />
           </div>
+        </TabsContent>
+
+        {/* Expenses Tab */}
+        <TabsContent value="expenses" className="mt-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold">Farm Expenses</h3>
+              <p className="text-sm text-muted-foreground">All expenditure across crops on this farm.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setBulkExpenseOpen(true)} disabled={farm.isArchived}>
+                <Layers className="h-4 w-4" /> Bulk Add
+              </Button>
+              <Button size="sm" className="gap-1.5 bg-[#1C4E35] hover:bg-[#163d29] text-white" onClick={() => setAddExpenseOpen(true)} disabled={farm.isArchived}>
+                <Plus className="h-4 w-4" /> Add Expense
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {expenseSummary ? (
+              <ExpenseSummaryCard summary={expenseSummary} />
+            ) : (
+              <div className="h-48 rounded-xl bg-muted/30 animate-pulse" />
+            )}
+            <div className="rounded-xl border border-border bg-card p-4">
+              {expenseSummary && Object.keys(expenseSummary.byCategory).length > 0 ? (
+                <ExpenseCategoryChart summaryData={expenseSummary} />
+              ) : (
+                <div className="flex items-center justify-center h-full min-h-[160px] text-sm text-muted-foreground">
+                  No expense data yet
+                </div>
+              )}
+            </div>
+          </div>
+
+          <ExpenseList farmId={farmId} />
+
+          <Dialog open={addExpenseOpen} onOpenChange={setAddExpenseOpen}>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Add Expense</DialogTitle></DialogHeader>
+              {/* Crop picker then form */}
+              <CropPickerThenForm farmId={farmId} onSuccess={() => setAddExpenseOpen(false)} />
+            </DialogContent>
+          </Dialog>
+
+          {/* Bulk add: pick a crop first */}
+          <Dialog open={bulkExpenseOpen} onOpenChange={setBulkExpenseOpen}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader><DialogTitle>Choose a Crop — Bulk Add</DialogTitle></DialogHeader>
+              <FarmCropPickerBulk
+                farmId={farmId}
+                onClose={() => setBulkExpenseOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* Soil Tests Tab */}
@@ -377,6 +454,109 @@ function FarmDetailContent({ farmId }: { farmId: Id<"farms"> }) {
 }
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
+
+function CropPickerThenForm({
+  farmId,
+  onSuccess,
+}: {
+  farmId: Id<"farms">;
+  onSuccess: () => void;
+}) {
+  const [cropId, setCropId] = useState<Id<"crops"> | null>(null);
+  const crops = useQuery(api.crops.listCropsByFarm, { farmId });
+
+  if (cropId) {
+    return <AddExpenseForm cropId={cropId} onSuccess={onSuccess} />;
+  }
+
+  const active = crops?.filter((c) => c.status === "active") ?? [];
+
+  if (crops === undefined) {
+    return (
+      <div className="space-y-2 py-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-12 bg-muted rounded-lg animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (active.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground text-center py-6">
+        No active crops on this farm. Add a crop first.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2 py-2">
+      <p className="text-xs text-muted-foreground mb-3">Select the crop this expense belongs to:</p>
+      {active.map((crop) => (
+        <button
+          key={crop._id}
+          onClick={() => setCropId(crop._id)}
+          className="w-full text-left flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted/50 hover:border-primary/30 transition-all"
+        >
+          <p className="text-sm font-semibold">{crop.name}</p>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function FarmCropPickerBulk({
+  farmId,
+  onClose,
+}: {
+  farmId: Id<"farms">;
+  onClose: () => void;
+}) {
+  const [cropId, setCropId] = useState<Id<"crops"> | null>(null);
+  const crops = useQuery(api.crops.listCropsByFarm, { farmId });
+
+  if (cropId) {
+    return (
+      <BulkExpenseDialog
+        cropId={cropId}
+        open={true}
+        onOpenChange={(o) => { if (!o) { setCropId(null); onClose(); } }}
+      />
+    );
+  }
+
+  const active = crops?.filter((c) => c.status === "active") ?? [];
+
+  if (crops === undefined) {
+    return (
+      <div className="space-y-2 py-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-12 bg-muted rounded-lg animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 py-2">
+      {active.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">No active crops on this farm.</p>
+      ) : (
+        active.map((crop) => (
+          <button
+            key={crop._id}
+            onClick={() => setCropId(crop._id)}
+            className="w-full text-left flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted/50 transition-all"
+          >
+            <p className="text-sm font-semibold">{crop.name}</p>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </button>
+        ))
+      )}
+    </div>
+  );
+}
 
 function InfoPill({
   label, value, icon, muted,

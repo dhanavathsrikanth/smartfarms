@@ -27,7 +27,9 @@ import {
   Trophy,
   MapPin,
   ShieldAlert,
-  Loader2
+  Loader2,
+  Receipt,
+  TrendingDown,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -35,6 +37,7 @@ import { FarmWithCropStats } from "@/types/farm";
 import { CropWithStats } from "@/types/crop";
 import { formatINR } from "@/lib/utils";
 import { CropStatusBadge } from "@/components/crops/CropStatusBadge";
+import { ExpenseCategoryBadge } from "@/app/components/expenses/ExpenseCategoryBadge";
 
 export default function DashboardPage() {
   useStoreUserEffect();
@@ -87,6 +90,18 @@ function FarmDashboard() {
   const activeCrops = crops?.filter((c: CropWithStats) => c.status === "active") ?? [];
   const totalArea = farms?.reduce((sum: number, f: FarmWithCropStats) => sum + f.totalArea, 0) ?? 0;
 
+  // This month's expenses
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+  const monthStart = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
+  const monthEnd = `${currentYear}-${String(currentMonth).padStart(2, "0")}-31`;
+  const recentExpenses = useQuery(api.expenses.listAllExpenses, {});
+  const monthExpenses = useQuery(api.expenses.listAllExpenses, {
+    startDate: monthStart,
+    endDate: monthEnd,
+  });
+  const monthTotal = monthExpenses?.reduce((s, e) => s + e.amount, 0) ?? 0;
+
   return (
     <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
@@ -131,12 +146,11 @@ function FarmDashboard() {
             accentColor="text-secondary"
           />
           <StatCard
-            label="Best Performance"
-            value={cropStats === undefined ? "—" : cropStats.bestPerformingCrop.split(" (")[0]}
-            unit="Peak"
-            icon={<Trophy className="h-4 w-4" />}
-            loading={cropStats === undefined}
-            accentColor="text-secondary"
+            label="Spent This Month"
+            value={monthExpenses === undefined ? "—" : formatINR(monthTotal)}
+            icon={<TrendingDown className="h-4 w-4" />}
+            loading={monthExpenses === undefined}
+            accentColor="text-rose-500"
           />
         </div>
 
@@ -267,6 +281,67 @@ function FarmDashboard() {
                 )}
               </CardContent>
             </Card>
+
+            {/* ─── Recent Expenses ─── */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <div>
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-rose-500" />
+                    Recent Expenses
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    {monthExpenses === undefined ? "Loading…" : `${formatINR(monthTotal)} spent this month`}
+                  </CardDescription>
+                </div>
+                <Link href="/dashboard/expenses">
+                  <Button variant="ghost" size="sm" className="text-xs gap-1 text-muted-foreground">
+                    View all <ArrowUpRight className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                {recentExpenses === undefined ? (
+                  <>
+                    <SkeletonRow />
+                    <SkeletonRow />
+                    <SkeletonRow />
+                  </>
+                ) : recentExpenses.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground border-2 border-dashed rounded-lg bg-muted/10">
+                    <p className="font-semibold text-foreground">No expenses recorded yet</p>
+                    <p className="text-xs mt-1">Add your first expense via any crop page.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {recentExpenses.slice(0, 5).map((expense) => (
+                      <Link
+                        key={expense._id}
+                        href={`/dashboard/expenses`}
+                        className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/40 transition-colors"
+                      >
+                        <ExpenseCategoryBadge category={expense.category} size="sm" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate">{expense.cropName}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{expense.farmName}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-bold font-mono">{formatINR(expense.amount)}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {new Date(expense.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                    <Link href="/dashboard/expenses">
+                      <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground mt-2 gap-1">
+                        View all expenses <ArrowRight className="h-3 w-3" />
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right: Sidebar (1/3 wide) */}
@@ -280,7 +355,7 @@ function FarmDashboard() {
               <CardContent className="space-y-2">
                 <QuickAction icon={<TreePine className="h-4 w-4" />} label="Register Farm" primary onClick={() => setCreateOpen(true)} />
                 <QuickAction icon={<Sprout className="h-4 w-4" />} label="Add New Crop" onClick={() => setCreateCropOpen(true)} />
-                <QuickAction icon={<BarChart3 className="h-4 w-4" />} label="Record Expense" />
+                <QuickAction icon={<Receipt className="h-4 w-4" />} label="Record Expense" href="/dashboard/expenses" />
                 <QuickAction icon={<TrendingUp className="h-4 w-4" />} label="Log a Sale" />
               </CardContent>
             </Card>
@@ -425,8 +500,8 @@ function FarmRow({ farm }: { farm: FarmWithCropStats }) {
   );
 }
 
-function QuickAction({ icon, label, primary, onClick }: { icon: React.ReactNode; label: string; primary?: boolean; onClick?: () => void }) {
-  return (
+function QuickAction({ icon, label, primary, onClick, href }: { icon: React.ReactNode; label: string; primary?: boolean; onClick?: () => void; href?: string }) {
+  const btn = (
     <Button
       variant={primary ? "default" : "outline"}
       className={`w-full justify-start gap-2 text-sm font-medium h-9 ${primary ? "btn-primary-branding" : ""}`}
@@ -436,6 +511,8 @@ function QuickAction({ icon, label, primary, onClick }: { icon: React.ReactNode;
       {label}
     </Button>
   );
+  if (href) return <Link href={href}>{btn}</Link>;
+  return btn;
 }
 
 function EmptyFarmState({ onAddClick }: { onAddClick?: () => void }) {

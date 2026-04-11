@@ -27,6 +27,7 @@ import {
   LineChart as LineChartIcon,
   DollarSign,
   BarChart3,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +74,19 @@ import { formatINR, formatArea } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
+import {
+  ExpenseList,
+  ExpenseSummaryCard,
+  ExpenseCategoryChart,
+} from "@/app/components/expenses";
+import { AddExpenseForm } from "@/app/components/expenses/AddExpenseForm";
+import { BulkExpenseDialog } from "@/app/components/expenses/BulkExpenseDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   BarChart,
   Bar,
@@ -122,11 +136,14 @@ function CropDetailContent() {
   const [harvestOpen, setHarvestOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [addExpenseOpen, setAddExpenseOpen] = useState(false);
+  const [bulkExpenseOpen, setBulkExpenseOpen] = useState(false);
 
   // Queries
   const crop = useQuery(api.crops.getCrop, { cropId }) as CropWithStats | undefined | null;
   const timeline = useQuery(api.crops.getCropTimeline, { cropId });
   const photos = useQuery(api.cropPhotos.getPhotosByCrop, { cropId });
+  const expenseSummary = useQuery(api.expenses.getExpenseSummaryByCrop, { cropId });
 
   // Mutations
   const archiveCrop = useMutation(api.crops.archiveCrop);
@@ -645,14 +662,56 @@ function CropDetailContent() {
               </TabsContent>
 
               {/* ── Tab 2: Expenses ── */}
-              <TabsContent value="expenses" className="focus-visible:outline-none">
-                <PlaceholderTab
-                  module="Expense Tracking"
-                  description="Coming in Module 3. Log seed costs, fertilizer, labour, irrigation, and all other cultivation expenses."
-                  icon={<TrendingDown className="h-10 w-10 text-red-400" />}
-                  statLabel="Current Total Expenses"
-                  statValue={formatINR(crop.totalExpenses)}
-                  statColorClass="text-red-700"
+              <TabsContent value="expenses" className="focus-visible:outline-none space-y-6">
+                {/* Tab sub-header with actions */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-bold">Expense Tracking</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">All costs recorded for this crop cycle.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" onClick={() => setBulkExpenseOpen(true)}>
+                      <Layers className="h-3.5 w-3.5" /> Bulk Add
+                    </Button>
+                    <Button size="sm" className="gap-1.5 text-xs h-8 bg-[#1C4E35] hover:bg-[#163d29] text-white" onClick={() => setAddExpenseOpen(true)}>
+                      <Plus className="h-3.5 w-3.5" /> Add Expense
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Summary card + chart in a 2-col grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {expenseSummary ? (
+                    <ExpenseSummaryCard summary={expenseSummary} />
+                  ) : (
+                    <div className="h-48 rounded-xl bg-muted/30 animate-pulse" />
+                  )}
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    {expenseSummary && Object.keys(expenseSummary.byCategory).length > 0 ? (
+                      <ExpenseCategoryChart summaryData={expenseSummary} />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-sm text-muted-foreground min-h-[160px]">
+                        No expense data yet
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Full expense list */}
+                <ExpenseList cropId={cropId} />
+
+                {/* Add expense dialog */}
+                <Dialog open={addExpenseOpen} onOpenChange={setAddExpenseOpen}>
+                  <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader><DialogTitle>Add Expense</DialogTitle></DialogHeader>
+                    <AddExpenseForm cropId={cropId} onSuccess={() => setAddExpenseOpen(false)} />
+                  </DialogContent>
+                </Dialog>
+
+                <BulkExpenseDialog
+                  cropId={cropId}
+                  open={bulkExpenseOpen}
+                  onOpenChange={setBulkExpenseOpen}
                 />
               </TabsContent>
 
