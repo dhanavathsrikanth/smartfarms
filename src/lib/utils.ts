@@ -6,16 +6,36 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Format a number as Indian Rupees (₹).
- * Uses the en-IN locale for proper Indian comma grouping (1,23,456).
- * Values ≥ 1 lakh are shown in compact form (e.g. ₹1.2L) to save space.
+ * Format a number as Indian Rupees (₹) with smart shorthand.
+ * - < ₹1000 : exact (₹850)
+ * - ₹1k–₹99,999 : standard Indian commas (₹12,450)
+ * - ₹1 lakh+ : compact shorthand (₹1.24L)
+ * - ₹1 crore+ : compact shorthand (₹1.2Cr)
  */
 export function formatINR(amount: number): string {
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? "-" : "";
+  if (abs >= 1_00_00_000) {
+    // ≥ 1 crore
+    return `${sign}₹${(abs / 1_00_00_000).toFixed(1).replace(/\.0$/, "")}Cr`;
+  } else if (abs >= 1_00_000) {
+    // ≥ 1 lakh
+    return `${sign}₹${(abs / 1_00_000).toFixed(2).replace(/\.?0+$/, "")}L`;
+  } else {
+    // Standard Indian comma grouping, no decimals
+    return `${sign}₹${Math.round(abs).toLocaleString("en-IN")}`;
+  }
+}
+
+/**
+ * Full Indian-number-system format with commas, always ₹X,XX,XXX.
+ * Use in detailed tables and PDF reports.
+ */
+export function formatINRFull(amount: number): string {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
-    notation: Math.abs(amount) >= 100_000 ? "compact" : "standard",
   }).format(amount);
 }
 

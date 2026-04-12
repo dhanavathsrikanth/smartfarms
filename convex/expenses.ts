@@ -962,3 +962,40 @@ export const markNotificationRead = mutation({
     await ctx.db.patch(notificationId, { isRead: true });
   },
 });
+
+/**
+ * 21. getExpenseTrendByFarm — Returns this year vs last year expense total
+ *     for a specific farm. Used to show "↑ 12% vs last season" on FarmCard.
+ */
+export const getExpenseTrendByFarm = query({
+  args: { farmId: v.id("farms") },
+  handler: async (ctx, { farmId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const farm = await ctx.db.get(farmId);
+    if (!farm || farm.userId !== identity.subject) return null;
+
+    const expenses = await ctx.db
+      .query("expenses")
+      .withIndex("by_farm", (q) => q.eq("farmId", farmId))
+      .collect();
+
+    const currentYear = new Date().getFullYear();
+    const prevYear = currentYear - 1;
+
+    const thisYearTotal = expenses
+      .filter((e) => e.date.startsWith(String(currentYear)))
+      .reduce((s, e) => s + e.amount, 0);
+
+    const lastYearTotal = expenses
+      .filter((e) => e.date.startsWith(String(prevYear)))
+      .reduce((s, e) => s + e.amount, 0);
+
+    const changePercent =
+      lastYearTotal > 0
+        ? Math.round(((thisYearTotal - lastYearTotal) / lastYearTotal) * 100)
+        : null;
+
+    return { thisYearTotal, lastYearTotal, changePercent, currentYear, prevYear };
+  },
+});

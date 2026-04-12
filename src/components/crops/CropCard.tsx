@@ -17,8 +17,10 @@ import {
   ArrowRight,
   Clock,
   Wheat,
-  Loader2
+  Loader2,
+  AlertTriangle,
 } from "lucide-react";
+import { formatINR } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -187,19 +189,24 @@ export function CropCard({ crop, onEdit, onMarkHarvested }: CropCardProps) {
         <div className="grid grid-cols-3 divide-x divide-border/50 border-t border-border/30 pt-4">
           <div className="text-center px-1">
             <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Expenses</p>
-            <p className="text-sm font-bold text-foreground">₹{crop.totalExpenses.toLocaleString()}</p>
+            <p className="text-sm font-bold text-foreground font-mono">{formatINR(crop.totalExpenses)}</p>
           </div>
           <div className="text-center px-1">
             <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Sales</p>
-            <p className="text-sm font-bold text-foreground font-mono">₹{crop.totalSales.toLocaleString()}</p>
+            <p className="text-sm font-bold text-foreground font-mono">{formatINR(crop.totalSales)}</p>
           </div>
           <div className="text-center px-1">
             <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Profit</p>
             <div className="flex items-center justify-center gap-0.5">
               {crop.profit >= 0 ? <TrendingUp className="h-3 w-3 text-emerald-600" /> : <TrendingDown className="h-3 w-3 text-red-600" />}
-              <p className={`text-sm font-bold ${crop.profit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-                {crop.profit >= 0 ? "+" : ""}₹{Math.abs(crop.profit).toLocaleString()}
+              <p className={`text-sm font-bold font-mono ${crop.profit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                {crop.profit >= 0 ? "+" : ""}{formatINR(crop.profit)}
               </p>
+              {crop.totalExpenses > crop.totalSales && crop.totalSales > 0 && (
+                <span title="Expenses exceed sales">
+                  <AlertTriangle className="h-3 w-3 text-amber-500 ml-0.5" />
+                </span>
+              )}
             </div>
           </div>
         </div>

@@ -2,7 +2,8 @@
 
 import { usePathname } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import { Authenticated, AuthLoading } from "convex/react";
+import { Authenticated, AuthLoading, useConvexAuth, useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import Link from "next/link";
 import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -38,7 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard",   href: "/dashboard",              icon: LayoutDashboard  },
   { label: "My Farms",    href: "/dashboard/farms",         icon: Landmark         },
   { label: "Crops",       href: "/dashboard/crops",         icon: Sprout },
-  { label: "Expenses",    href: "/dashboard/expenses",      icon: Receipt,  comingSoon: true },
+  { label: "Expenses",    href: "/dashboard/expenses",      icon: Receipt },
   { label: "Sales",       href: "/dashboard/sales",         icon: ShoppingCart, comingSoon: true },
   { label: "Reports",     href: "/dashboard/reports",       icon: FileText, comingSoon: true },
   { label: "AI Advisor",  href: "/dashboard/ai-advisor",    icon: BrainCircuit, comingSoon: true },
@@ -53,6 +54,20 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { isAuthenticated } = useConvexAuth();
+
+  const insights = useQuery(
+    api.expenses.getExpenseInsights,
+    isAuthenticated ? {} : "skip"
+  );
+
+  const hasInsights =
+    insights &&
+    (insights.categorySpike !== null ||
+      insights.unusualExpense !== null ||
+      (insights.missingCategories?.length ?? 0) > 0 ||
+      insights.topSupplier !== null ||
+      (insights.expenseForecast?.estimatedRemainingAmount ?? 0) > 0);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -93,7 +108,12 @@ export default function DashboardLayout({
         {/* Nav Items */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
           {NAV_ITEMS.map((item) => (
-            <NavLink key={item.href} item={item} onNavigate={() => setSidebarOpen(false)} />
+            <NavLink 
+              key={item.href} 
+              item={item} 
+              onNavigate={() => setSidebarOpen(false)} 
+              hasBadge={item.label === "Expenses" && !!hasInsights}
+            />
           ))}
         </nav>
 
@@ -130,7 +150,7 @@ export default function DashboardLayout({
 
 // ─── NavLink ────────────────────────────────────────────────────────────────
 
-function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }) {
+function NavLink({ item, onNavigate, hasBadge }: { item: NavItem; onNavigate: () => void; hasBadge?: boolean }) {
   const pathname = usePathname();
 
   // Active: exact match for /dashboard, prefix match for sub-pages
@@ -179,7 +199,12 @@ function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }
           isActive ? "text-secondary" : "text-muted-foreground"
         )}
       />
-      <span className="flex-1 truncate">{item.label}</span>
+      <div className="flex-1 min-w-0 flex items-center justify-between">
+        <span className="truncate">{item.label}</span>
+        {hasBadge && (
+          <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0 ml-2" title="New Insights" />
+        )}
+      </div>
       {isActive && (
         <ChevronRight className="h-3 w-3 text-secondary/60 shrink-0" />
       )}

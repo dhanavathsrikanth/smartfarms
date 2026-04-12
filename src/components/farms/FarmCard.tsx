@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { FarmWithStats, EditableFarm } from "@/types/farm";
 import { formatINR, formatArea } from "@/lib/utils";
@@ -24,6 +24,9 @@ import {
   Archive,
   Eye,
   TreePine,
+  ArrowUp,
+  ArrowDown,
+  Minus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -38,6 +41,8 @@ export function FarmCard({ farm }: FarmCardProps) {
   const archiveFarm = useMutation(api.farms.archiveFarm);
   const [editOpen, setEditOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
+
+  const trend = useQuery(api.expenses.getExpenseTrendByFarm, { farmId: farm._id });
 
   const profit = farm.totalProfit ?? 0;
   const isProfitable = profit >= 0;
@@ -157,22 +162,42 @@ export function FarmCard({ farm }: FarmCardProps) {
             </div>
           </div>
 
-          {/* Profit/Loss Row */}
+          {/* Profit/Loss Row + Expense Trend */}
           {farm.totalProfit !== undefined && (
             <div className="flex items-center justify-between pt-3 border-t border-border">
               <span className="text-xs text-muted-foreground">Net Profit</span>
-              <span
-                className={`flex items-center gap-1 text-sm font-bold ${
-                  isProfitable ? "text-emerald-600" : "text-rose-500"
-                }`}
-              >
-                {isProfitable ? (
-                  <TrendingUp className="h-3.5 w-3.5" />
-                ) : (
-                  <TrendingDown className="h-3.5 w-3.5" />
+              <div className="flex flex-col items-end gap-0.5">
+                <span
+                  className={`flex items-center gap-1 text-sm font-bold ${
+                    isProfitable ? "text-emerald-600" : "text-rose-500"
+                  }`}
+                >
+                  {isProfitable ? (
+                    <TrendingUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <TrendingDown className="h-3.5 w-3.5" />
+                  )}
+                  {formatINR(profit)}
+                </span>
+                {/* Expense trend vs last year */}
+                {trend && trend.changePercent !== null && trend.lastYearTotal > 0 && (
+                  <span
+                    className={`flex items-center gap-0.5 text-[10px] font-semibold ${
+                      trend.changePercent > 0 ? "text-rose-500" : "text-emerald-600"
+                    }`}
+                    title={`Expenses: ${trend.currentYear} vs ${trend.prevYear}`}
+                  >
+                    {trend.changePercent > 0 ? (
+                      <ArrowUp className="h-2.5 w-2.5" />
+                    ) : trend.changePercent < 0 ? (
+                      <ArrowDown className="h-2.5 w-2.5" />
+                    ) : (
+                      <Minus className="h-2.5 w-2.5" />
+                    )}
+                    {Math.abs(trend.changePercent)}% spend vs last yr
+                  </span>
                 )}
-                {formatINR(profit)}
-              </span>
+              </div>
             </div>
           )}
 
