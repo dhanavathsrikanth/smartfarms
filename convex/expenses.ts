@@ -663,3 +663,109 @@ export const searchExpenses = query({
     return result.sort((a, b) => b.date.localeCompare(a.date));
   },
 });
+
+/**
+ * 15. generateExpenseReport — Aggregates all expense data for PDF/report generation.
+ */
+export const generateExpenseReport = query({
+  args: {
+    farmId: v.optional(v.id("farms")),
+    cropId: v.optional(v.id("crops")),
+    year: v.optional(v.number()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+  },
+  handler: async (ctx, { farmId, cropId, year, startDate, endDate }) => {
+    const userId = await getAuthenticatedUserId(ctx);
+
+    let expenses = await ctx.db
+      .query("expenses")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    if (farmId) {
+      await verifyFarmOwnership(ctx, farmId, userId);
+      expenses = expenses.filter((e) => e.farmId === farmId);
+    }
+    if (cropId) {
+      await verifyCropOwnership(ctx, cropId, userId);
+      expenses = expenses.filter((e) => e.cropId === cropId);
+    }
+    if (year !== undefined) expenses = expenses.filter((e) => e.date.startsWith(String(year)));
+    if (startDate) expenses = expenses.filter((e) => e.date >= startDate);
+    if (endDate) expenses = expenses.filter((e) => e.date <= endDate);
+
+    expenses = expenses.sort((a, b) => a.date.localeCompare(b.date));
+
+    const withNames = await Promise.all(
+      expenses.map(async (expense) => {
+        const [crop, farm] = await Promise.all([ctx.db.get(expense.cropId), ctx.db.get(expense.farmId)]);
+        return { ...expense, cropName: crop?.name ?? "Unknown Crop", farmName: farm?.name ?? "Unknown Farm" };
+      })
+    );
+
+    const byCategory: Record<string, { total: number; count: number }> = {};
+    for (const e of expenses) {
+      if (!byCategory[e.category]) byCategory[e.category] = { total: 0, count: 0 };
+      byCategory[e.category].total += e.amount;
+      byCategory[e.category].count += 1;
+    }
+
+    const byMonth: Record<string, number> = {};
+    for (const e of expenses) {
+      const key = e.date.slice(0, 7);
+      byMonth[key] = (byMonth[key] ?? 0) + e.amount;
+    }
+    const monthlyTrend = Object.entries(byMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, total]) => ({ month, total }));
+
+    const totalAmount = expenses.reduce((s, e) => s + e.amount, 0);
+
+    let period = "All Time";
+    if (year) period = String(year);
+    else if (startDate && endDate) period = `${startDate} to ${endDate}`;
+
+    let title = "Expense Report";
+    if (farmId) { const farm = await ctx.db.get(farmId); title = `Expense Report — ${farm?.name ?? "Farm"}`; }
+    if (cropId) { const crop = await ctx.db.get(cropId); title = `Expense Report — ${crop?.name ?? "Crop"}`; }
+
+    return {
+      title,
+      generatedAt: new Date().toISOString(),
+      period,
+      summary: { totalAmount, count: expenses.length, byCategory },
+      expenses: withNames,
+      charts: {
+        categoryBreakdown: Object.entries(byCategory).map(([cat, { total, count }]) => ({
+          category: cat, total, count, pct: totalAmount > 0 ? ((total / totalAmount) * 100).toFixed(1) : "0",
+        })),
+        monthlyTrend,
+      },
+    };
+  },
+});
+
+/**
+ * 16. getExpenseCalendarData — Returns daily expense totals for the heatmap calendar.
+ */
+export const getExpenseCalendarData = query({
+  args: { year: v.number(), farmId: v.optional(v.id("farms")) },
+  handler: async (ctx, { year, farmId }) => {
+    const userId = await getAuthenticatedUserId(ctx);
+    let expenses = await ctx.db
+      .query("expenses")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    expenses = expenses.filter((e) => e.date.startsWith(String(year)));
+    if (farmId) expenses = expenses.filter((e) => e.farmId === farmId);
+    const byDay: Record<string, { total: number; count: number }> = {};
+    for (const e of expenses) {
+      const day = e.date.slice(0, 10);
+      if (!byDay[day]) byDay[day] = { total: 0, count: 0 };
+      byDay[day].total += e.amount;
+      byDay[day].count += 1;
+    }
+    return byDay;
+  },
+});

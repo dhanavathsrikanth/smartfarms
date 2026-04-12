@@ -41,9 +41,16 @@ import {
   Star,
   ShieldAlert,
   Loader2,
+  BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 import { FarmWithCropStats } from "@/types/farm";
+import dynamic from "next/dynamic";
+
+const ExpenseReportDownloadButton = dynamic(
+  () => import("../../components/expenses/ExpenseReportPDF").then((m) => m.ExpenseReportDownloadButton),
+  { ssr: false, loading: () => null }
+);
 
 export default function ExpensesPage() {
   useStoreUserEffect();
@@ -89,6 +96,12 @@ function ExpensesContent() {
     api.expenses.getExpenseSummaryByFarm,
     farmFilter !== "all" ? { farmId: farmFilter as Id<"farms">, year: yearFilter } : "skip"
   );
+
+  // Report data for PDF download (respects current filters)
+  const reportData = useQuery(api.expenses.generateExpenseReport, {
+    ...(farmFilter !== "all" ? { farmId: farmFilter as Id<"farms"> } : {}),
+    ...(yearFilter !== undefined ? { year: yearFilter } : {}),
+  });
 
   // Derive available year options from byMonth data
   const availableYears = useMemo(() => {
@@ -143,6 +156,17 @@ function ExpensesContent() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <Link href="/dashboard/expenses/analytics">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <BarChart3 className="h-4 w-4" /> Analytics
+            </Button>
+          </Link>
+          {reportData && (
+            <ExpenseReportDownloadButton
+              data={reportData}
+              fileName={`KhetSmart-Expenses-${farmFilter !== "all" ? (farms?.find((f) => f._id === farmFilter)?.name ?? "Farm") : "All-Farms"}-${summaryYear ? new Date().getFullYear() : "all"}.pdf`}
+            />
+          )}
           <Button
             variant="outline"
             size="sm"
