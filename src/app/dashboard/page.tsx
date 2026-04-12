@@ -39,6 +39,8 @@ import { formatINR } from "@/lib/utils";
 import { CropStatusBadge } from "@/components/crops/CropStatusBadge";
 import { ExpenseCategoryBadge } from "@/app/components/expenses/ExpenseCategoryBadge";
 import { QuickExpenseWidget } from "@/app/components/expenses/QuickExpenseWidget";
+import { PendingPaymentsWidget } from "@/app/components/sales/PendingPaymentsWidget";
+import { PaymentStatusBadge } from "@/app/components/sales/PaymentStatusBadge";
 
 export default function DashboardPage() {
   useStoreUserEffect();
@@ -103,6 +105,24 @@ function FarmDashboard() {
   });
   const monthTotal = monthExpenses?.reduce((s, e) => s + e.amount, 0) ?? 0;
 
+  const recentSales = useQuery(api.sales.listAllSales, {})?.slice(0, 3);
+  const currentYearSales = useQuery(api.sales.getSaleSummaryAllFarms, { year: currentYear });
+  const lastYearSales = useQuery(api.sales.getSaleSummaryAllFarms, { year: currentYear - 1 });
+  
+  const currentYearExpenses = useQuery(api.expenses.listAllExpenses, { 
+    startDate: `${currentYear}-01-01`, 
+    endDate: `${currentYear}-12-31` 
+  });
+  const lastYearExpenses = useQuery(api.expenses.listAllExpenses, { 
+    startDate: `${currentYear - 1}-01-01`, 
+    endDate: `${currentYear - 1}-12-31` 
+  });
+
+  const yearProfit = (currentYearSales?.totalRevenue || 0) - (currentYearExpenses?.reduce((s, e) => s + e.amount, 0) ?? 0);
+  const lastYearProfit = (lastYearSales?.totalRevenue || 0) - (lastYearExpenses?.reduce((s, e) => s + e.amount, 0) ?? 0);
+  
+  const profitTrend = lastYearProfit !== 0 ? ((yearProfit - lastYearProfit) / Math.abs(lastYearProfit)) * 100 : 0;
+
   return (
     <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
@@ -140,11 +160,16 @@ function FarmDashboard() {
             highlighted
           />
           <StatCard
-            label="Total Profit"
-            value={cropStats === undefined ? "—" : formatINR(cropStats.totalProfitAllTime)}
+            label="Total Profit This Year"
+            value={formatINR(yearProfit)}
             icon={<TrendingUp className="h-4 w-4" />}
-            loading={cropStats === undefined}
-            accentColor="text-secondary"
+            loading={currentYearSales === undefined || currentYearExpenses === undefined}
+            accentColor="text-emerald-500"
+            trend={{
+              value: `${Math.abs(Math.round(profitTrend))}%`,
+              isUp: profitTrend >= 0,
+              label: "vs last year"
+            }}
           />
           <StatCard
             label="Spent This Month"
@@ -343,6 +368,70 @@ function FarmDashboard() {
                 )}
               </CardContent>
             </Card>
+
+            {/* ─── Recent Sales ─── */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <div>
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <ShoppingCart className="h-4 w-4 text-emerald-600" />
+                    Recent Sales
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    Last 3 transactions recorded
+                  </CardDescription>
+                </div>
+                <Link href="/dashboard/sales">
+                  <Button variant="ghost" size="sm" className="text-xs gap-1 text-muted-foreground">
+                    View all <ArrowUpRight className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                {recentSales === undefined ? (
+                  <>
+                    <SkeletonRow />
+                    <SkeletonRow />
+                    <SkeletonRow />
+                  </>
+                ) : recentSales.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground border-2 border-dashed rounded-lg bg-muted/10">
+                    <p className="font-semibold text-foreground">No sales recorded yet</p>
+                    <p className="text-xs mt-1">Grow your business by logging your first sale.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {recentSales.map((sale) => (
+                      <Link
+                        key={sale._id}
+                        href="/dashboard/sales"
+                        className="flex items-center justify-between p-3 rounded-xl border border-border bg-card hover:bg-muted/30 transition-all shadow-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50">
+                            <ShoppingCart className="h-5 w-5 text-emerald-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold leading-none">{sale.cropName}</p>
+                            <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                              <Users className="h-2.5 w-2.5" /> {sale.buyerName}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right space-y-1.5">
+                          <p className="text-sm font-bold font-mono text-emerald-600 leading-none">
+                            {formatINR(sale.totalAmount)}
+                          </p>
+                          <div className="flex items-center justify-end">
+                            <PaymentStatusBadge status={sale.paymentStatus} />
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right: Sidebar (1/3 wide) */}
@@ -350,6 +439,9 @@ function FarmDashboard() {
 
             {/* Quick Expense Widget */}
             <QuickExpenseWidget />
+
+            {/* Pending Payments Widget */}
+            <PendingPaymentsWidget />
 
             {/* Quick Actions */}
             <Card>
@@ -445,6 +537,11 @@ function StatCard({
   loading?: boolean;
   accentColor?: string;
   highlighted?: boolean;
+  trend?: {
+    value: string;
+    isUp: boolean;
+    label: string;
+  };
 }) {
   return (
     <Card className={highlighted ? "bg-secondary text-white border-secondary" : ""}>
@@ -460,10 +557,21 @@ function StatCard({
               <span className={highlighted ? "text-white/70" : accentColor}>{icon}</span>
               {label}
             </div>
-            <div className="flex items-end gap-1.5">
-              <span className={`text-2xl font-bold tracking-tight ${highlighted ? "text-white" : "text-foreground"}`}>{value}</span>
-              {unit && <span className={`text-xs mb-0.5 ${highlighted ? "text-white/60" : "text-muted-foreground"}`}>{unit}</span>}
+            <div className="flex items-end justify-between gap-1.5">
+              <div className="flex items-end gap-1.5">
+                <span className={`text-2xl font-bold tracking-tight ${highlighted ? "text-white" : "text-foreground"}`}>{value}</span>
+                {unit && <span className={`text-xs mb-0.5 ${highlighted ? "text-white/60" : "text-muted-foreground"}`}>{unit}</span>}
+              </div>
+              {trend && (
+                <div className={`flex items-center gap-0.5 text-[10px] font-bold ${trend.isUp ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  {trend.isUp ? <ArrowUpRight className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  {trend.value}
+                </div>
+              )}
             </div>
+            {trend && (
+              <p className="text-[9px] text-muted-foreground font-medium -mt-1">{trend.label}</p>
+            )}
           </div>
         )}
       </CardContent>

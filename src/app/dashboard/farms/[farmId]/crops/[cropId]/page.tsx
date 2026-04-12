@@ -82,6 +82,11 @@ import {
 import { AddExpenseForm } from "@/app/components/expenses/AddExpenseForm";
 import { BulkExpenseDialog } from "@/app/components/expenses/BulkExpenseDialog";
 import {
+  SaleList,
+  ProfitWaterfallChart,
+  AddSaleForm
+} from "@/app/components/sales";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -138,12 +143,15 @@ function CropDetailContent() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
   const [bulkExpenseOpen, setBulkExpenseOpen] = useState(false);
+  const [addSaleOpen, setAddSaleOpen] = useState(false);
 
   // Queries
   const crop = useQuery(api.crops.getCrop, { cropId }) as CropWithStats | undefined | null;
   const timeline = useQuery(api.crops.getCropTimeline, { cropId });
   const photos = useQuery(api.cropPhotos.getPhotosByCrop, { cropId });
   const expenseSummary = useQuery(api.expenses.getExpenseSummaryByCrop, { cropId });
+  const saleSummary = useQuery(api.sales.getSaleSummaryByCrop, { cropId });
+  const profitTimeline = useQuery(api.sales.getSalesVsExpensesTimeline, { cropId });
 
   // Mutations
   const archiveCrop = useMutation(api.crops.archiveCrop);
@@ -716,15 +724,66 @@ function CropDetailContent() {
               </TabsContent>
 
               {/* ── Tab 3: Sales ── */}
-              <TabsContent value="sales" className="focus-visible:outline-none">
-                <PlaceholderTab
-                  module="Sales Management"
-                  description="Coming in Module 4. Track buyers, market rates, and record crop arrivals at mandis."
-                  icon={<TrendingUp className="h-10 w-10 text-emerald-400" />}
-                  statLabel="Current Total Revenue"
-                  statValue={formatINR(crop.totalSales)}
-                  statColorClass="text-emerald-700"
-                />
+              <TabsContent value="sales" className="focus-visible:outline-none space-y-6">
+                {/* Tab header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-bold">Sales & Revenue</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Track buyers, weight sold, and market rates.</p>
+                  </div>
+                  <Button size="sm" className="gap-1.5 text-xs h-8 bg-[#1C4E35] hover:bg-[#163d29] text-white" onClick={() => setAddSaleOpen(true)}>
+                    <Plus className="h-3.5 w-3.5" /> Record Sale
+                  </Button>
+                </div>
+
+                {/* Summary Strip */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCardMini 
+                    label="Total Revenue" 
+                    value={formatINR(saleSummary?.totalRevenue || 0)} 
+                    icon={<TrendingUp className="h-3 w-3 text-emerald-600" />} 
+                  />
+                  <StatCardMini 
+                    label="Pending Amount" 
+                    value={formatINR(saleSummary?.pendingAmount || 0)} 
+                    icon={<Clock className="h-3 w-3 text-rose-500" />} 
+                  />
+                  <StatCardMini 
+                    label="Sales Count" 
+                    value={(saleSummary?.saleCount || 0).toString()} 
+                    icon={<ShoppingCart className="h-3 w-3 text-blue-500" />} 
+                  />
+                  <StatCardMini 
+                    label="Avg Rate / KG" 
+                    value={`₹${(saleSummary?.averageRatePerKg || 0).toFixed(2)}`} 
+                    icon={<BarChart3 className="h-3 w-3 text-purple-500" />} 
+                  />
+                </div>
+
+                {/* Profit Waterfall Chart */}
+                <Card className="shadow-sm border-border/50">
+                  <CardHeader className="pb-3 px-6">
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-secondary" />
+                      Profit Flow
+                    </CardTitle>
+                    <CardDescription>Visualizing expenses vs sales and running profit</CardDescription>
+                  </CardHeader>
+                  <CardContent className="h-80 w-full pt-2">
+                    <ProfitWaterfallChart timelineEvents={profitTimeline} />
+                  </CardContent>
+                </Card>
+
+                {/* Sale List */}
+                <SaleList cropId={cropId} />
+
+                {/* Add Sale Dialog */}
+                <Dialog open={addSaleOpen} onOpenChange={setAddSaleOpen}>
+                  <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader><DialogTitle>Record Sale</DialogTitle></DialogHeader>
+                    <AddSaleForm cropId={cropId} onSuccess={() => setAddSaleOpen(false)} />
+                  </DialogContent>
+                </Dialog>
               </TabsContent>
 
               {/* ── Tab 4: Yield ── */}
@@ -904,6 +963,18 @@ function PlaceholderTab({
           <p className={`text-3xl font-black ${statColorClass}`}>{statValue}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function StatCardMini({ label, value, icon }: { label: string, value: string, icon: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-border/50 bg-card p-3 space-y-1 shadow-sm">
+      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      <p className="text-sm font-bold truncate">{value}</p>
     </div>
   );
 }

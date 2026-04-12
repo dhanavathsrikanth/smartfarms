@@ -62,6 +62,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SaleList, SalesRevenueChart } from "@/app/components/sales";
 
 export default function FarmDetailPage() {
   useStoreUserEffect();
@@ -96,6 +97,7 @@ function FarmDetailContent({ farmId }: { farmId: Id<"farms"> }) {
   const [bulkExpenseOpen, setBulkExpenseOpen] = useState(false);
 
   const expenseSummary = useQuery(api.expenses.getExpenseSummaryByFarm, { farmId });
+  const saleSummary = useQuery(api.sales.getSaleSummaryByFarm, { farmId });
 
   const handleArchive = async () => {
     setArchiving(true);
@@ -301,6 +303,9 @@ function FarmDetailContent({ farmId }: { farmId: Id<"farms"> }) {
           <TabsTrigger value="expenses" className="gap-1.5">
             <Receipt className="h-4 w-4" /> Expenses
           </TabsTrigger>
+          <TabsTrigger value="sales" className="gap-1.5">
+            <TrendingUp className="h-4 w-4" /> Sales
+          </TabsTrigger>
           <TabsTrigger value="soil" className="gap-1.5">
             <FlaskConical className="h-4 w-4" /> Soil Tests
           </TabsTrigger>
@@ -377,7 +382,7 @@ function FarmDetailContent({ farmId }: { farmId: Id<"farms"> }) {
           </Dialog>
 
           {/* Bulk add: pick a crop first */}
-          <Dialog open={bulkExpenseOpen} onOpenChange={setBulkExpenseOpen}>
+          <Dialog open={bulkExpenseOpen} onOpenChange={setAddExpenseOpen}>
             <DialogContent className="max-w-sm">
               <DialogHeader><DialogTitle>Choose a Crop — Bulk Add</DialogTitle></DialogHeader>
               <FarmCropPickerBulk
@@ -386,6 +391,60 @@ function FarmDetailContent({ farmId }: { farmId: Id<"farms"> }) {
               />
             </DialogContent>
           </Dialog>
+        </TabsContent>
+
+        {/* Sales Tab */}
+        <TabsContent value="sales" className="mt-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold">Farm Sales</h3>
+              <p className="text-sm text-muted-foreground">Revenue and buyer performance for this farm.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="shadow-sm border-border/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-emerald-600" />
+                  Monthly Farm Revenue
+                </CardTitle>
+                <CardDescription>Trend of sales from all crops on this farm</CardDescription>
+              </CardHeader>
+              <CardContent className="h-72">
+                <SalesRevenueChart monthlyRevenue={saleSummary?.monthlyRevenue || []} />
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm border-border/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Users className="h-4 w-4 text-emerald-600" />
+                  Top Buyer Contributions
+                </CardTitle>
+                <CardDescription>Top crops by revenue contribution</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {saleSummary?.cropBreakdown && saleSummary.cropBreakdown.length > 0 ? (
+                  saleSummary.cropBreakdown.slice(0, 3).map((crop) => (
+                    <div key={crop.cropId} className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-muted/20">
+                      <div>
+                        <p className="text-sm font-bold">{crop.cropName}</p>
+                        <p className="text-xs text-muted-foreground">Avg Rate: ₹{crop.averageRate.toFixed(1)}/kg</p>
+                      </div>
+                      <p className="font-bold text-emerald-700">{formatINR(crop.totalRevenue)}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="h-full flex items-center justify-center text-sm text-muted-foreground py-10">
+                    No sales recorded yet
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <SaleList farmId={farmId} />
         </TabsContent>
 
         {/* Soil Tests Tab */}

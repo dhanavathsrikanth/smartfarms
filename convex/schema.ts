@@ -254,4 +254,28 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_unread", ["userId", "isRead"]),
+
+  // --- 13. BUYERS ---
+  buyers: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    contact: v.optional(v.string()),
+    address: v.optional(v.string()),
+    buyerType: v.union(
+      v.literal("trader"),
+      v.literal("mandi"),
+      v.literal("company"),
+      v.literal("retailer"),
+      v.literal("direct_consumer"),
+      v.literal("exporter"),
+      v.literal("other")
+    ),
+    notes: v.optional(v.string()),
+    isVerified: v.boolean(),
+    rating: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_name", ["userId", "name"]),
 });
+

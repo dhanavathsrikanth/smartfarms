@@ -8,11 +8,13 @@
  * @module
  */
 
+import type * as analytics from "../analytics.js";
 import type * as cropPhotos from "../cropPhotos.js";
 import type * as crops from "../crops.js";
 import type * as expenses from "../expenses.js";
 import type * as farms from "../farms.js";
 import type * as http from "../http.js";
+import type * as sales from "../sales.js";
 import type * as users from "../users.js";
 
 import type {
@@ -22,11 +24,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  analytics: typeof analytics;
   cropPhotos: typeof cropPhotos;
   crops: typeof crops;
   expenses: typeof expenses;
   farms: typeof farms;
   http: typeof http;
+  sales: typeof sales;
   users: typeof users;
 }>;
 
