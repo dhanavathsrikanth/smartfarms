@@ -21,3 +21,7 @@ export { ExpenseTrendChart } from "./ExpenseTrendChart";
 export { ExpenseSummaryCard } from "./ExpenseSummaryCard";
 
 export { ExpensePhotoViewer } from "./ExpensePhotoViewer";
+
+export { ExpenseInsightsPanel } from "./ExpenseInsightsPanel";
+
+export { QuickExpenseWidget } from "./QuickExpenseWidget";

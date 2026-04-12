@@ -769,3 +769,196 @@ export const getExpenseCalendarData = query({
     return byDay;
   },
 });
+
+// ─── SMART INSIGHTS ────────────────────────────────────────────────────────────
+
+/**
+ * 17. getExpenseInsights — Analyse expense patterns and return actionable insights.
+ */
+export const getExpenseInsights = query({
+  args: { farmId: v.optional(v.id("farms")) },
+  handler: async (ctx, { farmId }) => {
+    const userId = await getAuthenticatedUserId(ctx);
+    const currentYear = new Date().getFullYear();
+    const prevYear = currentYear - 1;
+
+    // Load all expenses for the user (optionally scoped to one farm)
+    let all = await ctx.db
+      .query("expenses")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    if (farmId) all = all.filter((e) => e.farmId === farmId);
+
+    const thisYear = all.filter((e) => e.date.startsWith(String(currentYear)));
+    const lastYear = all.filter((e) => e.date.startsWith(String(prevYear)));
+
+    // ── a) categorySpike ────────────────────────────────────────────────────
+    const thisYearByCategory: Record<string, number> = {};
+    const lastYearByCategory: Record<string, number> = {};
+    for (const e of thisYear) thisYearByCategory[e.category] = (thisYearByCategory[e.category] ?? 0) + e.amount;
+    for (const e of lastYear) lastYearByCategory[e.category] = (lastYearByCategory[e.category] ?? 0) + e.amount;
+
+    let categorySpike: { category: string; thisYear: number; lastYear: number; percentIncrease: number } | null = null;
+    for (const [cat, thisAmt] of Object.entries(thisYearByCategory)) {
+      const lastAmt = lastYearByCategory[cat] ?? 0;
+      if (lastAmt > 0) {
+        const pct = ((thisAmt - lastAmt) / lastAmt) * 100;
+        if (pct >= 30 && (categorySpike === null || pct > categorySpike.percentIncrease)) {
+          categorySpike = { category: cat, thisYear: thisAmt, lastYear: lastAmt, percentIncrease: Math.round(pct) };
+        }
+      }
+    }
+
+    // ── b) unusualExpense ────────────────────────────────────────────────────
+    const avgByCategory: Record<string, number> = {};
+    const countByCategory: Record<string, number> = {};
+    for (const e of all) {
+      avgByCategory[e.category] = (avgByCategory[e.category] ?? 0) + e.amount;
+      countByCategory[e.category] = (countByCategory[e.category] ?? 0) + 1;
+    }
+    for (const cat of Object.keys(avgByCategory)) {
+      avgByCategory[cat] = avgByCategory[cat] / countByCategory[cat];
+    }
+
+    let unusualExpense: { expenseId: Id<"expenses">; category: string; amount: number; average: number; date: string } | null = null;
+    for (const e of thisYear) {
+      const avg = avgByCategory[e.category] ?? 0;
+      if (avg > 0 && e.amount > avg * 2) {
+        if (!unusualExpense || e.amount > unusualExpense.amount) {
+          unusualExpense = { expenseId: e._id, category: e.category, amount: e.amount, average: Math.round(avg), date: e.date };
+        }
+      }
+    }
+
+    // ── c) missingCategories ─────────────────────────────────────────────────
+    const activeCrops = await ctx.db
+      .query("crops")
+      .withIndex("by_status", (q) => q.eq("userId", userId).eq("status", "active"))
+      .collect();
+
+    const essentialCategories = ["seed", "fertilizer"] as const;
+    const missingCategories: Array<{ cropName: string; missingCategory: string }> = [];
+
+    for (const crop of activeCrops.slice(0, 10)) {
+      if (farmId && crop.farmId !== farmId) continue;
+      const cropExpenses = all.filter((e) => e.cropId === crop._id);
+      const recordedCats = new Set(cropExpenses.map((e) => e.category));
+      for (const essential of essentialCategories) {
+        if (!recordedCats.has(essential)) {
+          missingCategories.push({ cropName: crop.name, missingCategory: essential });
+        }
+      }
+    }
+
+    // ── d) topSupplier ───────────────────────────────────────────────────────
+    const supplierMap: Record<string, { total: number; count: number }> = {};
+    for (const e of all) {
+      if (!e.supplier) continue;
+      if (!supplierMap[e.supplier]) supplierMap[e.supplier] = { total: 0, count: 0 };
+      supplierMap[e.supplier].total += e.amount;
+      supplierMap[e.supplier].count += 1;
+    }
+    const topSupplierEntry = Object.entries(supplierMap).sort((a, b) => b[1].total - a[1].total)[0];
+    const topSupplier = topSupplierEntry
+      ? { supplierName: topSupplierEntry[0], totalAmount: topSupplierEntry[1].total, transactionCount: topSupplierEntry[1].count }
+      : null;
+
+    // ── e) expenseForecast ───────────────────────────────────────────────────
+    const currentMonth = new Date().getMonth() + 1; // 1-indexed
+    const currentYearToDate = thisYear.reduce((s, e) => s + e.amount, 0);
+    const lastYearTotal = lastYear.reduce((s, e) => s + e.amount, 0);
+
+    // Last year's spending from month currentMonth+1 onwards = estimated remaining
+    const lastYearRemaining = lastYear
+      .filter((e) => {
+        const m = parseInt(e.date.slice(5, 7), 10);
+        return m > currentMonth;
+      })
+      .reduce((s, e) => s + e.amount, 0);
+
+    const expenseForecast = {
+      estimatedRemainingAmount: Math.round(lastYearRemaining),
+      currentYearToDate: Math.round(currentYearToDate),
+      lastYearTotal: Math.round(lastYearTotal),
+    };
+
+    return { categorySpike, unusualExpense, missingCategories, topSupplier, expenseForecast };
+  },
+});
+
+// ─── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+
+/**
+ * 18. checkInventoryOnExpense — Create a low-stock notification when a
+ *     seed/fertilizer/pesticide expense references an inventory item below threshold.
+ *     Called internally after createExpense succeeds.
+ */
+export const checkInventoryOnExpense = mutation({
+  args: { expenseId: v.id("expenses") },
+  handler: async (ctx, { expenseId }) => {
+    const expense = await ctx.db.get(expenseId);
+    if (!expense) return;
+    if (!["seed", "fertilizer", "pesticide"].includes(expense.category)) return;
+    if (!expense.inventoryItemId) return;
+
+    const item = await ctx.db.get(expense.inventoryItemId);
+    if (!item) return;
+
+    if (item.quantity <= item.lowStockThreshold) {
+      // Avoid duplicate notifications — check if one already exists in last 24h
+      const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+      const existing = await ctx.db
+        .query("notifications")
+        .withIndex("by_user", (q) => q.eq("userId", expense.userId))
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("type"), "low_stock"),
+            q.eq(q.field("relatedId"), expense.inventoryItemId as string),
+            q.gte(q.field("createdAt"), oneDayAgo)
+          )
+        )
+        .first();
+
+      if (!existing) {
+        await ctx.db.insert("notifications", {
+          userId: expense.userId,
+          type: "low_stock",
+          title: `Low Stock: ${item.itemName}`,
+          message: `Only ${item.quantity} ${item.unit} of ${item.itemName} remaining (threshold: ${item.lowStockThreshold} ${item.unit}). Consider restocking soon.`,
+          relatedId: expense.inventoryItemId as string,
+          isRead: false,
+          createdAt: Date.now(),
+        });
+      }
+    }
+  },
+});
+
+/**
+ * 19. getNotifications — Fetch all notifications for the current user.
+ */
+export const getNotifications = query({
+  args: { unreadOnly: v.optional(v.boolean()) },
+  handler: async (ctx, { unreadOnly }) => {
+    const userId = await getAuthenticatedUserId(ctx);
+    let notifications = await ctx.db
+      .query("notifications")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    if (unreadOnly) notifications = notifications.filter((n) => !n.isRead);
+    return notifications.sort((a, b) => b.createdAt - a.createdAt);
+  },
+});
+
+/**
+ * 20. markNotificationRead — Mark a notification as read.
+ */
+export const markNotificationRead = mutation({
+  args: { notificationId: v.id("notifications") },
+  handler: async (ctx, { notificationId }) => {
+    const userId = await getAuthenticatedUserId(ctx);
+    const notif = await ctx.db.get(notificationId);
+    if (!notif || notif.userId !== userId) throw new ConvexError("Not found");
+    await ctx.db.patch(notificationId, { isRead: true });
+  },
+});

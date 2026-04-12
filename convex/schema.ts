@@ -236,4 +236,22 @@ export default defineSchema({
   })
     .index("by_crop", ["cropId"])
     .index("by_farm", ["farmId"]),
+
+  // --- 12. NOTIFICATIONS ---
+  notifications: defineTable({
+    userId: v.string(),
+    type: v.union(
+      v.literal("low_stock"),
+      v.literal("price_alert"),
+      v.literal("weather"),
+      v.literal("ai_insight")
+    ),
+    title: v.string(),
+    message: v.string(),
+    relatedId: v.optional(v.string()),
+    isRead: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_unread", ["userId", "isRead"]),
 });

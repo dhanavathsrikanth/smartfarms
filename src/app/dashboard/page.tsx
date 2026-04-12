@@ -38,6 +38,7 @@ import { CropWithStats } from "@/types/crop";
 import { formatINR } from "@/lib/utils";
 import { CropStatusBadge } from "@/components/crops/CropStatusBadge";
 import { ExpenseCategoryBadge } from "@/app/components/expenses/ExpenseCategoryBadge";
+import { QuickExpenseWidget } from "@/app/components/expenses/QuickExpenseWidget";
 
 export default function DashboardPage() {
   useStoreUserEffect();
@@ -346,6 +347,9 @@ function FarmDashboard() {
 
           {/* Right: Sidebar (1/3 wide) */}
           <div className="space-y-6">
+
+            {/* Quick Expense Widget */}
+            <QuickExpenseWidget />
 
             {/* Quick Actions */}
             <Card>

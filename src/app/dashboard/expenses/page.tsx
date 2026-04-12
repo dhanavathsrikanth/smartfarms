@@ -13,6 +13,7 @@ import {
   AddExpenseForm,
 } from "../../components/expenses";
 import { BulkExpenseDialog } from "../../components/expenses/BulkExpenseDialog";
+import { ExpenseInsightsPanel } from "../../components/expenses/ExpenseInsightsPanel";
 import { formatINR } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -295,6 +296,11 @@ function ExpensesContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Insights Panel ── */}
+      <ExpenseInsightsPanel
+        farmId={farmFilter !== "all" ? (farmFilter as Id<"farms">) : undefined}
+      />
 
       {/* ── Filters Bar ── */}
       <div className="flex flex-wrap items-center gap-3 border-b border-border pb-4">
