@@ -5,6 +5,7 @@ import { ClerkProvider } from '@clerk/nextjs'
 import ConvexClientProvider from '@/components/ConvexClientProvider'
 import { Navbar } from '@/components/Navbar'
 import { Toaster } from '@/components/ui/sonner'
+import { Analytics } from '@vercel/analytics/next'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -36,6 +37,7 @@ export default function RootLayout({
               {children}
             </div>
             <Toaster richColors position="top-right" />
+            <Analytics />
           </ConvexClientProvider>
         </ClerkProvider>
       </body>
