@@ -1678,7 +1678,7 @@ export const sendWeeklyDigestEmail = internalAction({
       await resend.emails.send({
         from: "KhetSmart <digest@khetsmart.app>",
         to: user.email,
-        subject: `Your KhetSmart Weekly Farm Summary — ${dateLabel}`,
+        subject: `Your KhetSmart Weekly Farm Summary - ${dateLabel}`,
         html,
       });
     }
