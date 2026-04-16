@@ -17,19 +17,20 @@ import {
   ArrowRight,
   TrendingUp,
   BarChart3,
-  Calendar,
-  Zap,
   Activity,
   ChevronRight,
   Plus,
   ArrowUpRight,
   History,
-  Trophy,
-  MapPin,
   ShieldAlert,
-  Loader2,
+  MapPin,
   Receipt,
   TrendingDown,
+  ShoppingCart,
+  Users,
+  Wheat,
+  Scale,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -41,20 +42,21 @@ import { ExpenseCategoryBadge } from "@/app/components/expenses/ExpenseCategoryB
 import { QuickExpenseWidget } from "@/app/components/expenses/QuickExpenseWidget";
 import { PendingPaymentsWidget } from "@/app/components/sales/PendingPaymentsWidget";
 import { PaymentStatusBadge } from "@/app/components/sales/PaymentStatusBadge";
+import { ProfitSummaryCard } from "@/app/components/sales/ProfitSummaryCard";
+
+// Analytics Module Components
+import { ProfitTrendSparkline } from "@/app/components/analytics/ProfitTrendSparkline";
+import { MonthlyPLChart } from "@/app/components/analytics/MonthlyPLChart";
 
 export default function DashboardPage() {
   useStoreUserEffect();
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Thin loading bar — never blocks the full page */}
       <AuthLoading>
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-secondary" />
-            <p className="text-sm text-muted-foreground font-medium tracking-widest uppercase">
-              Loading your farm data…
-            </p>
-          </div>
+        <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-secondary/20">
+          <div className="h-full bg-secondary animate-pulse" style={{ width: "60%" }} />
         </div>
       </AuthLoading>
 
@@ -84,44 +86,33 @@ export default function DashboardPage() {
 
 function FarmDashboard() {
   const { user } = useUser();
-  const farms = useQuery(api.farms.listFarms) as FarmWithCropStats[] | undefined;
-  const crops = useQuery(api.crops.listAllCrops) as CropWithStats[] | undefined;
-  const cropStats = useQuery(api.crops.getCropSummaryStats);
+  const currentYear = new Date().getFullYear();
+  // Using type assertion to bypass temporary Convex API sync lag in the IDE
+  const dashboardData = useQuery((api.analytics as any).getMainDashboardData, { year: currentYear });
+
+  // Map consolidated data to local variables for component compatibility
+  const farms = dashboardData?.farms;
+  const crops = dashboardData?.crops;
+  const stats = dashboardData?.stats;
+  const recentSales = dashboardData?.recentSales;
+  const recentExpenses = dashboardData?.recentExpenses;
+  const cropsMissingYield = dashboardData?.cropsMissingYield ?? [];
+  const cropRanking = dashboardData?.cropRanking;
+  const analyticProfitTrend = dashboardData?.profitTrend;
+  const yields = dashboardData?.yields;
+
   const [createOpen, setCreateOpen] = useState(false);
   const [createCropOpen, setCreateCropOpen] = useState(false);
 
-  const activeCrops = crops?.filter((c: CropWithStats) => c.status === "active") ?? [];
-  const totalArea = farms?.reduce((sum: number, f: FarmWithCropStats) => sum + f.totalArea, 0) ?? 0;
+  const activeCrops = crops?.filter((c: any) => c.status === "active") ?? [];
+  const totalArea = farms?.reduce((sum: number, f: any) => sum + f.totalArea, 0) ?? 0;
 
-  // This month's expenses
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
-  const monthStart = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
-  const monthEnd = `${currentYear}-${String(currentMonth).padStart(2, "0")}-31`;
-  const recentExpenses = useQuery(api.expenses.listAllExpenses, {});
-  const monthExpenses = useQuery(api.expenses.listAllExpenses, {
-    startDate: monthStart,
-    endDate: monthEnd,
-  });
-  const monthTotal = monthExpenses?.reduce((s, e) => s + e.amount, 0) ?? 0;
-
-  const recentSales = useQuery(api.sales.listAllSales, {})?.slice(0, 3);
-  const currentYearSales = useQuery(api.sales.getSaleSummaryAllFarms, { year: currentYear });
-  const lastYearSales = useQuery(api.sales.getSaleSummaryAllFarms, { year: currentYear - 1 });
-  
-  const currentYearExpenses = useQuery(api.expenses.listAllExpenses, { 
-    startDate: `${currentYear}-01-01`, 
-    endDate: `${currentYear}-12-31` 
-  });
-  const lastYearExpenses = useQuery(api.expenses.listAllExpenses, { 
-    startDate: `${currentYear - 1}-01-01`, 
-    endDate: `${currentYear - 1}-12-31` 
-  });
-
-  const yearProfit = (currentYearSales?.totalRevenue || 0) - (currentYearExpenses?.reduce((s, e) => s + e.amount, 0) ?? 0);
-  const lastYearProfit = (lastYearSales?.totalRevenue || 0) - (lastYearExpenses?.reduce((s, e) => s + e.amount, 0) ?? 0);
-  
-  const profitTrend = lastYearProfit !== 0 ? ((yearProfit - lastYearProfit) / Math.abs(lastYearProfit)) * 100 : 0;
+  const monthTotal = stats?.monthTotalExpenses ?? 0;
+  const currentYearExpensesTotal = stats?.totalExpenses ?? 0;
+  const yearProfit = stats?.yearProfit ?? 0;
+  const yearRevenue = stats?.totalRevenue ?? 0;
+  const yearMargin = stats?.yearMargin ?? 0;
+  const profitTrend = stats?.profitTrend ?? 0;
 
   return (
     <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -142,8 +133,59 @@ function FarmDashboard() {
         </Button>
       </div>
 
-        {/* ── KPI Stats Row ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ── Missing Yield Banners ── */}
+      {cropsMissingYield.length > 0 && (
+        <div className="flex items-center justify-between p-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 shadow-sm mb-2 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+             <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+             <div>
+               <p className="font-bold text-amber-800">{cropsMissingYield.length} Harvested crop(s) missing yield data</p>
+               <p className="text-sm font-medium opacity-80 flex flex-wrap gap-1">
+                 {cropsMissingYield.slice(0, 3).map((c: any) => (
+                   <span key={c._id}>• {c.name} ({c.farmName})</span>
+                 ))}
+                 {cropsMissingYield.length > 3 && <span>...and {cropsMissingYield.length - 3} more.</span>}
+               </p>
+             </div>
+          </div>
+          <Link href="/dashboard/crops">
+            <Button variant="outline" className="bg-white border-amber-300 text-amber-700 hover:bg-amber-100 shrink-0">Review Crops</Button>
+          </Link>
+        </div>
+      )}
+
+      {/* ── Top Level Profit Summary ── */}
+      <ProfitSummaryCard 
+        totalProfit={yearProfit}
+        margin={yearMargin}
+        trend={profitTrend}
+        loading={dashboardData === undefined}
+      />
+
+      {/* ── Analytics Quick-access banner ── */}
+      <Link href="/dashboard/analytics" className="block">
+        <div className="flex items-center justify-between rounded-xl border border-[#1C4E35]/20 bg-gradient-to-r from-[#1C4E35]/5 via-[#1C4E35]/3 to-transparent px-5 py-3 hover:from-[#1C4E35]/10 transition-colors group">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1C4E35]/10">
+              <BarChart3 className="h-4 w-4 text-[#1C4E35]" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[#1C4E35]">Full Analytics Dashboard</p>
+              <p className="text-[11px] text-muted-foreground">Crop ranking · P&amp;L charts · Break-even · Annual report</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 text-xs font-semibold text-[#1C4E35] group-hover:translate-x-0.5 transition-transform">
+            View <ChevronRight className="h-3.5 w-3.5" />
+          </div>
+        </div>
+      </Link>
+      {/* ── Pending Payments — directly below profit card ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <PendingPaymentsWidget />
+        </div>
+        {/* ── KPI Stats (compact 1 col) ── */}
+        <div className="grid grid-cols-2 gap-4 content-start">
           <StatCard
             label="Total Farms"
             value={farms === undefined ? "—" : String(farms.length)}
@@ -153,32 +195,28 @@ function FarmDashboard() {
           />
           <StatCard
             label="Active Crops"
-            value={cropStats === undefined ? "—" : String(cropStats.totalActiveCrops)}
+            value={stats === undefined ? "—" : String(stats.totalActiveCrops)}
             icon={<Sprout className="h-4 w-4" />}
-            loading={cropStats === undefined}
+            loading={stats === undefined}
             accentColor="text-primary-foreground"
             highlighted
           />
           <StatCard
-            label="Total Profit This Year"
-            value={formatINR(yearProfit)}
-            icon={<TrendingUp className="h-4 w-4" />}
-            loading={currentYearSales === undefined || currentYearExpenses === undefined}
-            accentColor="text-emerald-500"
-            trend={{
-              value: `${Math.abs(Math.round(profitTrend))}%`,
-              isUp: profitTrend >= 0,
-              label: "vs last year"
-            }}
+            label="Revenue"
+            value={formatINR(yearRevenue)}
+            icon={<BarChart3 className="h-4 w-4" />}
+            loading={dashboardData === undefined}
+            accentColor="text-blue-500"
           />
           <StatCard
-            label="Spent This Month"
-            value={monthExpenses === undefined ? "—" : formatINR(monthTotal)}
+            label="This Month"
+            value={dashboardData === undefined ? "—" : formatINR(monthTotal)}
             icon={<TrendingDown className="h-4 w-4" />}
-            loading={monthExpenses === undefined}
+            loading={dashboardData === undefined}
             accentColor="text-rose-500"
           />
         </div>
+      </div>
 
         {/* ── Main Grid ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -282,7 +320,7 @@ function FarmDashboard() {
                       <Link 
                         key={crop._id} 
                         href={`/dashboard/farms/${crop.farmId}/crops/${crop._id}`}
-                        className="flex items-center justify-between p-3 rounded-xl border border-border bg-card hover:bg-muted/30 transition-all hover:shadow-sm"
+                        className="group flex items-center justify-between p-3 rounded-xl border border-border bg-card hover:bg-muted/30 transition-all hover:shadow-sm"
                       >
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary/10">
@@ -295,11 +333,14 @@ function FarmDashboard() {
                             </p>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1.5">
+                      <div className="flex flex-col items-end gap-1.5">
                           <CropStatusBadge status={crop.status} />
                           <p className={`text-xs font-bold ${crop.profit >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
                             {crop.profit >= 0 ? "+" : ""}{formatINR(crop.profit)}
                           </p>
+                          <span className="text-[10px] font-semibold text-[#1C4E35] opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                            Analytics <ChevronRight className="h-2.5 w-2.5" />
+                          </span>
                         </div>
                       </Link>
                     ))}
@@ -317,7 +358,7 @@ function FarmDashboard() {
                     Recent Expenses
                   </CardTitle>
                   <CardDescription className="text-xs mt-0.5">
-                    {monthExpenses === undefined ? "Loading…" : `${formatINR(monthTotal)} spent this month`}
+                    {dashboardData === undefined ? "Loading…" : `${formatINR(monthTotal)} spent this month`}
                   </CardDescription>
                 </div>
                 <Link href="/dashboard/expenses">
@@ -340,7 +381,7 @@ function FarmDashboard() {
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {recentExpenses.slice(0, 5).map((expense) => (
+                    {recentExpenses.slice(0, 5).map((expense: any) => (
                       <Link
                         key={expense._id}
                         href={`/dashboard/expenses`}
@@ -401,7 +442,7 @@ function FarmDashboard() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {recentSales.map((sale) => (
+                    {recentSales.map((sale: any) => (
                       <Link
                         key={sale._id}
                         href="/dashboard/sales"
@@ -432,6 +473,73 @@ function FarmDashboard() {
                 )}
               </CardContent>
             </Card>
+
+            {/* ─── Recent Harvests ─── */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <div>
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <Wheat className="h-4 w-4 text-amber-500" />
+                    Recent Harvests
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    Latest recorded yields across all farms
+                  </CardDescription>
+                </div>
+                <Link href="/dashboard/yields">
+                  <Button variant="ghost" size="sm" className="text-xs gap-1 text-muted-foreground">
+                    View all <ArrowUpRight className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                {yields === undefined ? (
+                  <>
+                    <SkeletonRow />
+                    <SkeletonRow />
+                    <SkeletonRow />
+                  </>
+                ) : yields.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground border-2 border-dashed rounded-lg bg-muted/10">
+                    <p className="font-semibold text-foreground">No harvests recorded</p>
+                    <p className="text-xs mt-1">Mark a crop as harvested to start tracking yields.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {yields.slice(0, 3).map((y: any) => {
+                      const crop = crops?.find((c: any) => c._id === y.cropId);
+                      return (
+                        <Link
+                          key={y._id}
+                          href={`/dashboard/farms/${y.farmId}/crops/${y.cropId}?tab=yield`}
+                          className="flex items-center justify-between p-3 rounded-xl border border-border bg-card hover:bg-muted/30 transition-all shadow-sm group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 shrink-0">
+                              <Scale className="h-5 w-5 text-amber-600" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold leading-none truncate">{crop?.name || "Unknown Crop"}</p>
+                              <p className="text-[10px] text-muted-foreground mt-1 truncate">
+                                Harvested: {new Date(y.harvestDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-bold font-mono text-amber-600 leading-none">
+                              {y.totalYield} {y.yieldUnit}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              {y.yieldPerAcreQuintal ? y.yieldPerAcreQuintal.toFixed(1) : 0} q/ac
+                            </p>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right: Sidebar (1/3 wide) */}
@@ -439,9 +547,6 @@ function FarmDashboard() {
 
             {/* Quick Expense Widget */}
             <QuickExpenseWidget />
-
-            {/* Pending Payments Widget */}
-            <PendingPaymentsWidget />
 
             {/* Quick Actions */}
             <Card>
@@ -451,8 +556,10 @@ function FarmDashboard() {
               <CardContent className="space-y-2">
                 <QuickAction icon={<TreePine className="h-4 w-4" />} label="Register Farm" primary onClick={() => setCreateOpen(true)} />
                 <QuickAction icon={<Sprout className="h-4 w-4" />} label="Add New Crop" onClick={() => setCreateCropOpen(true)} />
-                <QuickAction icon={<Receipt className="h-4 w-4" />} label="Record Expense" href="/dashboard/expenses" />
-                <QuickAction icon={<TrendingUp className="h-4 w-4" />} label="Log a Sale" />
+                <div className="grid grid-cols-2 gap-2">
+                  <QuickAction icon={<Receipt className="h-4 w-4" />} label="Record Expense" href="/dashboard/expenses" />
+                  <QuickAction icon={<TrendingUp className="h-4 w-4" />} label="Record a Sale" href="/dashboard/sales" />
+                </div>
               </CardContent>
             </Card>
 
@@ -519,6 +626,81 @@ function FarmDashboard() {
           </div>
         </div>
 
+        {/* ── Analytics Quick Glance ── */}
+        <div className="pt-6 border-t border-border/50">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-secondary" />
+              Your Farm at a Glance
+            </h2>
+            <Link href="/dashboard/analytics">
+              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1 hover:text-secondary">
+                View Full Analytics <ChevronRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="pb-3 px-5 pt-5">
+                <CardTitle className="text-base font-semibold flex items-center justify-between">
+                  Top Performing Crops
+                  <Badge variant="outline" className="text-[10px] font-bold tracking-widest uppercase bg-secondary/10 text-secondary border-none">{currentYear}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-5 space-y-3">
+                {cropRanking !== undefined ? (
+                  cropRanking.length > 0 ? (
+                    cropRanking.slice(0, 3).map((crop: any, idx: number) => (
+                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border border-border/50 bg-muted/20">
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-gray-400 text-lg font-bold">#{idx + 1}</span>
+                          <div>
+                            <p className="font-semibold text-sm">{crop.cropName}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5 max-w-[150px] truncate">{crop.farmName}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 mt-2 sm:mt-0">
+                           <div className="h-10 w-24">
+                              <ProfitTrendSparkline data={crop.totalProfit > 0 ? [crop.expenses, crop.revenue, crop.totalProfit] : [crop.expenses, crop.revenue, 0]} />
+                           </div>
+                           <div className="text-right w-24">
+                             <p className={`font-bold font-mono text-sm leading-none ${crop.totalProfit >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+                               {formatINR(crop.totalProfit)}
+                             </p>
+                             <p className="text-[10px] text-muted-foreground mt-1">Margin: {crop.margin.toFixed(1)}%</p>
+                           </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-sm text-muted-foreground bg-muted/10 rounded-lg border border-dashed">No profitable crops to rank yet.</div>
+                  )
+                ) : (
+                  <div className="space-y-2">
+                    <div className="h-14 bg-muted animate-pulse rounded-lg border"></div>
+                    <div className="h-14 bg-muted animate-pulse rounded-lg border"></div>
+                    <div className="h-14 bg-muted animate-pulse rounded-lg border"></div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3 px-5 pt-5">
+                <CardTitle className="text-base font-semibold">Profit History</CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-5 h-64">
+                {analyticProfitTrend ? (
+                   <MonthlyPLChart data={analyticProfitTrend.trend.slice(analyticProfitTrend.trend.length - 6)} />
+                ) : (
+                   <div className="h-full w-full bg-muted animate-pulse rounded-xl"></div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
       <CreateFarmDialog open={createOpen} onOpenChange={setCreateOpen} />
       <CreateCropDialog open={createCropOpen} onOpenChange={setCreateCropOpen} />
     </div>
@@ -528,7 +710,7 @@ function FarmDashboard() {
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function StatCard({
-  label, value, unit, icon, loading, accentColor, highlighted,
+  label, value, unit, icon, loading, accentColor, highlighted, trend,
 }: {
   label: string;
   value: string;

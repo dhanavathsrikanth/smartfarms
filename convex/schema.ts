@@ -117,7 +117,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_crop", ["cropId"])
-    .index("by_farm", ["farmId"]),
+    .index("by_farm", ["farmId"])
+    .index("by_user", ["userId"]),
 
   // --- 6. SOIL TESTS ---
   soilTests: defineTable({
@@ -277,5 +278,25 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_name", ["userId", "name"]),
+
+  // --- 14. CROP PLANS (PRE-INVESTMENT TOOLS) ---
+  cropPlans: defineTable({
+    userId: v.string(),
+    cropName: v.string(),
+    area: v.number(),
+    areaUnit: v.union(v.literal("acres"), v.literal("hectares"), v.literal("bigha")),
+    inputCosts: v.object({
+      seed: v.number(),
+      fertilizer: v.number(),
+      pesticide: v.number(),
+      labour: v.number(),
+      irrigation: v.number(),
+      other: v.number(),
+    }),
+    expectedYieldPerAcre: v.number(),
+    expectedRate: v.number(),
+    calculatedProfit: v.number(),
+    createdAt: v.number(),
+  }).index("by_user", ["userId"]),
 });
 

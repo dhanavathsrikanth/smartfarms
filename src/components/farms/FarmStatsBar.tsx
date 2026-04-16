@@ -2,16 +2,17 @@
 
 import { formatINR } from "@/lib/utils";
 import type { FarmStats } from "@/types/farm";
-import { TrendingUp, TrendingDown, Sprout, ShoppingCart, Wallet } from "lucide-react";
+import { TrendingUp, TrendingDown, Sprout, ShoppingCart, Wallet, Wheat, Scale } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface FarmStatsBarProps {
   stats: FarmStats;
+  yieldSummary?: any;
   className?: string;
 }
 
-export function FarmStatsBar({ stats, className }: FarmStatsBarProps) {
+export function FarmStatsBar({ stats, yieldSummary, className }: FarmStatsBarProps) {
   const isProfitable = stats.totalProfit >= 0;
 
   const pills = [
@@ -58,6 +59,27 @@ export function FarmStatsBar({ stats, className }: FarmStatsBarProps) {
       iconColor: "text-secondary",
     },
   ];
+
+  if (yieldSummary) {
+    pills.push({
+      label: "Total Harvest",
+      value: `${(yieldSummary.totalYieldKg / 100).toFixed(1)} q`,
+      icon: <Scale className="h-3.5 w-3.5" />,
+      valueClass: "text-[#1C4E35] font-bold",
+      bgClass: "bg-[#F7F0E3] border border-[#1C4E35]/10",
+      iconBg: "bg-[#1C4E35]/10",
+      iconColor: "text-[#1C4E35]",
+    });
+    pills.push({
+      label: "Avg Yield/Acre",
+      value: `${yieldSummary.averageYieldPerAcre ? (yieldSummary.averageYieldPerAcre / 100).toFixed(1) : 0} q/ac`,
+      icon: <Wheat className="h-3.5 w-3.5" />,
+      valueClass: "text-[#D4840A] font-bold",
+      bgClass: "bg-amber-50 border border-amber-200",
+      iconBg: "bg-amber-100",
+      iconColor: "text-amber-700",
+    });
+  }
 
   return (
     <div className={cn("flex flex-wrap gap-3", className)}>

@@ -19,12 +19,13 @@ import {
   BrainCircuit,
   Settings,
   Leaf,
-  Bell,
+  BarChart3,
   Menu,
   X,
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AlertsPanel } from "@/app/components/analytics/AlertsPanel";
 
 // ─── Nav config ─────────────────────────────────────────────────────────────
 
@@ -33,6 +34,7 @@ type NavItem = {
   href: string;
   icon: React.ElementType;
   comingSoon?: boolean;
+  subItems?: { label: string; href: string }[];
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -40,8 +42,19 @@ const NAV_ITEMS: NavItem[] = [
   { label: "My Farms",    href: "/dashboard/farms",         icon: Landmark         },
   { label: "Crops",       href: "/dashboard/crops",         icon: Sprout },
   { label: "Expenses",    href: "/dashboard/expenses",      icon: Receipt },
-  { label: "Sales",       href: "/dashboard/sales",         icon: ShoppingCart, comingSoon: true },
-  { label: "Reports",     href: "/dashboard/reports",       icon: FileText, comingSoon: true },
+  { label: "Sales",       href: "/dashboard/sales",         icon: ShoppingCart, 
+    subItems: [
+      { label: "All Sales", href: "/dashboard/sales" },
+      { label: "Buyers", href: "/dashboard/sales/buyers" },
+    ]
+  },
+  { label: "Analytics",   href: "/dashboard/analytics",    icon: BarChart3,
+    subItems: [
+      { label: "Overview",     href: "/dashboard/analytics" },
+      { label: "Crop Planner", href: "/dashboard/analytics" },
+      { label: "Reports",      href: "/dashboard/analytics/report" },
+    ]
+  },
   { label: "AI Advisor",  href: "/dashboard/ai-advisor",    icon: BrainCircuit, comingSoon: true },
   { label: "Settings",    href: "/dashboard/settings",      icon: Settings, comingSoon: true },
 ];
@@ -60,6 +73,13 @@ export default function DashboardLayout({
     api.expenses.getExpenseInsights,
     isAuthenticated ? {} : "skip"
   );
+
+  // Fetch Sales pending count at the top level — fixes React Hook Rules (no hooks in loops)
+  const salesSummary = useQuery(
+    api.sales.getSaleSummaryAllFarms,
+    isAuthenticated ? {} : "skip"
+  );
+  const hasPendingSales = (salesSummary?.totalPendingCount ?? 0) > 0;
 
   const hasInsights =
     insights &&
@@ -112,7 +132,10 @@ export default function DashboardLayout({
               key={item.href} 
               item={item} 
               onNavigate={() => setSidebarOpen(false)} 
-              hasBadge={item.label === "Expenses" && !!hasInsights}
+              hasBadge={
+                (item.label === "Expenses" && !!hasInsights) ||
+                (item.label === "Sales" && hasPendingSales)
+              }
             />
           ))}
         </nav>
@@ -150,10 +173,17 @@ export default function DashboardLayout({
 
 // ─── NavLink ────────────────────────────────────────────────────────────────
 
-function NavLink({ item, onNavigate, hasBadge }: { item: NavItem; onNavigate: () => void; hasBadge?: boolean }) {
+function NavLink({ 
+  item, 
+  onNavigate, 
+  hasBadge,
+}: { 
+  item: NavItem; 
+  onNavigate: () => void; 
+  hasBadge?: boolean;
+}) {
   const pathname = usePathname();
 
-  // Active: exact match for /dashboard, prefix match for sub-pages
   const isActive =
     item.href === "/dashboard"
       ? pathname === "/dashboard"
@@ -183,32 +213,58 @@ function NavLink({ item, onNavigate, hasBadge }: { item: NavItem; onNavigate: ()
   }
 
   return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      className={cn(
-        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150",
-        isActive
-          ? "bg-secondary/10 text-secondary font-semibold"
-          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-      )}
-    >
-      <Icon
+    <div className="space-y-1">
+      <Link
+        href={item.href}
+        onClick={onNavigate}
         className={cn(
-          "h-4 w-4 shrink-0 transition-colors",
-          isActive ? "text-secondary" : "text-muted-foreground"
+          "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150",
+          isActive
+            ? "bg-secondary/10 text-secondary font-semibold"
+            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
         )}
-      />
-      <div className="flex-1 min-w-0 flex items-center justify-between">
-        <span className="truncate">{item.label}</span>
-        {hasBadge && (
-          <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0 ml-2" title="New Insights" />
+      >
+        <Icon
+          className={cn(
+            "h-4 w-4 shrink-0 transition-colors",
+            isActive ? "text-secondary" : "text-muted-foreground"
+          )}
+        />
+        <div className="flex-1 min-w-0 flex items-center justify-between">
+          <span className="truncate">{item.label}</span>
+          {hasBadge && (
+            <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0 ml-2" />
+          )}
+        </div>
+        {isActive && !item.subItems && (
+          <ChevronRight className="h-3 w-3 text-secondary/60 shrink-0" />
         )}
-      </div>
-      {isActive && (
-        <ChevronRight className="h-3 w-3 text-secondary/60 shrink-0" />
+      </Link>
+      
+      {/* Sub-items rendered if parent is active and has them */}
+      {isActive && item.subItems && (
+        <div className="ml-9 space-y-1 border-l border-border/50 pl-3 py-1 mt-1">
+          {item.subItems.map((sub) => {
+            const isSubActive = pathname === sub.href;
+            return (
+              <Link
+                key={`${sub.label}-${sub.href}`}
+                href={sub.href}
+                onClick={onNavigate}
+                className={cn(
+                  "block py-1.5 text-xs font-medium transition-colors",
+                  isSubActive 
+                    ? "text-secondary font-bold" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {sub.label}
+              </Link>
+            );
+          })}
+        </div>
       )}
-    </Link>
+    </div>
   );
 }
 
@@ -270,12 +326,8 @@ function TopBarUser() {
 
   return (
     <div className="flex items-center gap-2">
-      {/* Notification bell */}
-      <button className="relative flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors">
-        <Bell className="h-4 w-4" />
-        {/* Unread dot */}
-        <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-secondary ring-2 ring-background" />
-      </button>
+      {/* Notification bell with live alerts panel */}
+      <AlertsPanel />
 
       <Separator orientation="vertical" className="h-6" />
 

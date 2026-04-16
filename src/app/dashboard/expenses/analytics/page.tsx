@@ -109,8 +109,8 @@ function AnalyticsContent() {
       (best, m) => (m.totalAmount > (best?.totalAmount ?? 0) ? m : best),
       summaryYear.byMonth?.[0]
     );
-    const biggestCategoryEntry = Object.entries(summaryYear.byCategory ?? {}).sort(
-      (a, b) => b[1] - a[1]
+    const biggestCategoryEntry = Object.entries(summaryYear.byCategory ?? ({} as any)).sort(
+      (a: any, b: any) => b[1].total - a[1].total
     )[0];
     const avgMonthly = monthlyAmounts.length > 0
       ? monthlyAmounts.reduce((s, v) => s + v, 0) / monthlyAmounts.length
@@ -124,8 +124,12 @@ function AnalyticsContent() {
     const thisYear = summaryYear?.byCategory ?? {};
     const prevYear = summaryPrevYear?.byCategory ?? {};
     return ALL_CATEGORIES.map((cat) => {
-      const thisAmt = thisYear[cat] ?? 0;
-      const prevAmt = prevYear[cat] ?? 0;
+      const thisCatObj = (thisYear as any)[cat];
+      const prevCatObj = (prevYear as any)[cat];
+      const thisAmt = thisCatObj?.total ?? 0;
+      const prevAmt = prevCatObj?.total ?? 0;
+      const count = thisCatObj?.count ?? 0;
+      
       const yoyPct =
         prevAmt > 0
           ? (((thisAmt - prevAmt) / prevAmt) * 100).toFixed(1)
@@ -136,6 +140,8 @@ function AnalyticsContent() {
       return {
         category: cat,
         amount: thisAmt,
+        count,
+        avg: count > 0 ? thisAmt / count : 0,
         pct: total > 0 ? ((thisAmt / total) * 100).toFixed(1) : "0",
         yoyPct,
         yoyUp: thisAmt >= prevAmt,
@@ -271,7 +277,7 @@ function AnalyticsContent() {
               stats?.biggestCategoryEntry ? (
                 <div className="flex flex-col gap-1 mt-1">
                   <ExpenseCategoryBadge category={stats.biggestCategoryEntry[0]} size="sm" />
-                  <span className="text-xs font-mono font-bold">{formatINR(stats.biggestCategoryEntry[1])}</span>
+                  <span className="text-xs font-mono font-bold">{formatINR((stats.biggestCategoryEntry[1] as any).total)}</span>
                 </div>
               ) : null
             }
@@ -333,8 +339,12 @@ function AnalyticsContent() {
                         <td className="px-4 py-3 text-right font-mono font-bold text-sm">
                           {row.amount > 0 ? formatINR(row.amount) : <span className="text-muted-foreground font-normal">—</span>}
                         </td>
-                        <td className="px-4 py-3 text-right text-muted-foreground hidden sm:table-cell">—</td>
-                        <td className="px-4 py-3 text-right text-muted-foreground hidden md:table-cell">—</td>
+                        <td className="px-4 py-3 text-right font-medium text-xs text-muted-foreground hidden sm:table-cell tabular-nums">
+                          {row.count > 0 ? row.count : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium text-xs text-muted-foreground hidden md:table-cell tabular-nums">
+                          {row.avg > 0 ? formatINR(Math.round(row.avg)) : "—"}
+                        </td>
                         <td className="px-4 py-3 text-right hidden sm:table-cell">
                           <div className="flex items-center justify-end gap-2">
                             <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -369,7 +379,9 @@ function AnalyticsContent() {
                   <td className="px-4 py-3 text-right font-mono font-bold text-sm">
                     {summaryYear ? formatINR(summaryYear.totalExpenses) : "—"}
                   </td>
-                  <td className="px-4 py-3 hidden sm:table-cell" />
+                  <td className="px-4 py-3 text-right font-mono font-bold text-sm hidden sm:table-cell">
+                    {summaryYear?.expenseCount ?? "—"}
+                  </td>
                   <td className="px-4 py-3 hidden md:table-cell" />
                   <td className="px-4 py-3 text-right text-white/70 text-xs hidden sm:table-cell">100%</td>
                   <td className="px-4 py-3 rounded-br-xl" />

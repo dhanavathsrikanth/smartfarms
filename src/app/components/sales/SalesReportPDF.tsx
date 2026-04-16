@@ -41,7 +41,9 @@ const styles = StyleSheet.create({
   tableCellHeader: { margin: "auto", marginTop: 3, fontSize: 9, fontWeight: "bold" },
   tableCell: { margin: "auto", marginTop: 3, fontSize: 8 },
   
-  tableCellPending: { margin: "auto", marginTop: 3, fontSize: 8, color: "#b45309", fontWeight: "bold" },
+  tableCellPending: { margin: "auto", marginTop: 3, fontSize: 8, color: "#92400e", fontWeight: "bold" },
+  tableRowPending: { margin: "auto", flexDirection: "row", backgroundColor: "#fffbeb" },
+  tableRowAlternate: { margin: "auto", flexDirection: "row", backgroundColor: "#f9fafb" },
   
   footer: { position: 'absolute', bottom: 30, left: 40, right: 40, textAlign: 'center', color: 'grey', fontSize: 8, borderTop: "1 solid #e5e7eb", pt: 10 },
 });
@@ -97,8 +99,11 @@ const ReportDocument = ({ data }: { data: any }) => (
           <View style={styles.tableColHeader}><Text style={styles.tableCellHeader}>Status</Text></View>
         </View>
         
-        {data.sales.map((sale: any, i: number) => (
-          <View style={styles.tableRow} key={i}>
+        {data.sales.map((sale: any, i: number) => {
+          const isPending = sale.paymentStatus === "pending" || sale.paymentStatus === "partial";
+          const rowStyle = isPending ? styles.tableRowPending : (i % 2 === 0 ? styles.tableRow : styles.tableRowAlternate);
+          return (
+          <View style={rowStyle} key={i}>
             <View style={styles.tableCol}><Text style={styles.tableCell}>{sale.date}</Text></View>
             <View style={styles.tableColWide}>
               <Text style={styles.tableCell}>{sale.cropName}</Text>
@@ -117,7 +122,9 @@ const ReportDocument = ({ data }: { data: any }) => (
               </Text>
             </View>
           </View>
-        ))}
+          );
+        })}
+
       </View>
 
       <Text style={styles.footer} render={({ pageNumber, totalPages }) => (

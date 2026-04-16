@@ -49,3 +49,30 @@ export function formatArea(area: number, unit: string): string {
   const formatted = parseFloat(area.toFixed(2)).toString();
   return `${formatted} ${label}`;
 }
+
+/**
+ * Format a weight as "50 Quintal", "1,200 KG", or "2.5 Ton".
+ * All numbers formatted with commas.
+ */
+export function formatWeight(weight: number, unit: string): string {
+  const label = unit === "kg" ? "KG" : unit.charAt(0).toUpperCase() + unit.slice(1);
+  const formatted = weight.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  });
+  return `${formatted} ${label}`;
+}
+
+/**
+ * Convert any weight unit to kg for comparison.
+ */
+export function convertToKg(weight: number, unit: string): number {
+  switch (unit.toLowerCase()) {
+    case "quintal":
+      return weight * 100;
+    case "ton":
+      return weight * 1000;
+    case "kg":
+    default:
+      return weight;
+  }
+}

@@ -16,12 +16,12 @@ export function ProfitWaterfallChart({ timelineEvents = [] }: { timelineEvents?:
 
   return (
     <div className="h-72 w-full">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <ComposedChart data={data} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
           <XAxis dataKey="shortDate" axisLine={false} tickLine={false} fontSize={12} tickMargin={8} />
           <YAxis axisLine={false} tickLine={false} fontSize={12} tickFormatter={formatCurrency} width={50} />
           <Tooltip 
-            formatter={(value: number, name: string) => [`₹${Math.abs(value).toLocaleString()}`, name === "displayAmount" ? "Amount" : "Running Balance"]}
+            formatter={(value: any, name: any) => [`₹${Math.abs(Number(value)).toLocaleString()}`, name === "displayAmount" ? "Amount" : "Running Balance"]}
             labelFormatter={(label, payload) => {
               if (!payload || !payload.length) return label;
               const event = payload[0].payload;

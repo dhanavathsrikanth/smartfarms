@@ -9,13 +9,16 @@
  */
 
 import type * as analytics from "../analytics.js";
+import type * as crons from "../crons.js";
 import type * as cropPhotos from "../cropPhotos.js";
 import type * as crops from "../crops.js";
 import type * as expenses from "../expenses.js";
 import type * as farms from "../farms.js";
 import type * as http from "../http.js";
+import type * as notifications from "../notifications.js";
 import type * as sales from "../sales.js";
 import type * as users from "../users.js";
+import type * as yields from "../yields.js";
 
 import type {
   ApiFromModules,
@@ -25,13 +28,16 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   analytics: typeof analytics;
+  crons: typeof crons;
   cropPhotos: typeof cropPhotos;
   crops: typeof crops;
   expenses: typeof expenses;
   farms: typeof farms;
   http: typeof http;
+  notifications: typeof notifications;
   sales: typeof sales;
   users: typeof users;
+  yields: typeof yields;
 }>;
 
 /**

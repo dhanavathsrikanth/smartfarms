@@ -112,8 +112,6 @@ export function AddExpenseForm({
   const [addAnother, setAddAnother] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const fileRef = useRef<HTMLInputElement>(null);
-
   const createExpense = useMutation(api.expenses.createExpense);
   const generateUploadUrl = useMutation(
     api.expenses.generateExpensePhotoUploadUrl
@@ -146,10 +144,14 @@ export function AddExpenseForm({
         headers: { "Content-Type": file.type },
         body: file,
       });
+      if (!res.ok) {
+        throw new Error(`Upload failed with status ${res.status}`);
+      }
       const { storageId } = await res.json();
       setUploadedPhotoUrl(storageId); // store storageId temporarily
       toast.success("Photo ready to attach");
-    } catch {
+    } catch (err) {
+      console.error("Photo upload error:", err);
       toast.error("Photo upload failed");
       setPhotoPreview(null);
     } finally {
@@ -342,47 +344,50 @@ export function AddExpenseForm({
         <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 block">
           Attach Photo <span className="text-muted-foreground font-normal">(optional)</span>
         </Label>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handlePhotoChange}
-        />
-        {photoPreview ? (
-          <div className="relative inline-block">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photoPreview}
-              alt="Preview"
-              className="h-24 w-24 rounded-xl object-cover border border-border"
+        <div className="flex flex-col gap-2">
+          {photoPreview ? (
+            <div className="relative inline-block w-fit">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photoPreview}
+                alt="Preview"
+                className="h-24 w-24 rounded-xl object-cover border border-border"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setPhotoPreview(null);
+                  setUploadedPhotoUrl(null);
+                }}
+                className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow z-10"
+              >
+                <X className="h-3 w-3" />
+              </button>
+              {uploading && (
+                <div className="absolute inset-0 rounded-xl bg-black/40 flex items-center justify-center z-10">
+                  <Loader2 className="h-5 w-5 animate-spin text-white" />
+                </div>
+              )}
+            </div>
+          ) : null}
+          
+          <div className={cn(photoPreview ? "mt-2" : "")}>
+            <input
+              id="photo-upload-input"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoChange}
             />
-            <button
-              type="button"
-              onClick={() => {
-                setPhotoPreview(null);
-                setUploadedPhotoUrl(null);
-              }}
-              className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow"
+            <label
+              htmlFor="photo-upload-input"
+              className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border px-4 py-3 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors cursor-pointer"
             >
-              <X className="h-3 w-3" />
-            </button>
-            {uploading && (
-              <div className="absolute inset-0 rounded-xl bg-black/40 flex items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-white" />
-              </div>
-            )}
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-2 rounded-xl border-2 border-dashed border-border px-4 py-3 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
-          >
-            <Upload className="h-4 w-4" />
-            Upload receipt / photo
-          </button>
-        )}
+              <Upload className="h-4 w-4" />
+              Upload receipt / photo
+            </label>
+            </div>
+        </div>
       </div>
 
       {/* Submit */}

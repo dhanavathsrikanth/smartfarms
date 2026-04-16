@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { CropWithStats } from "@/types/crop";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -44,6 +44,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import Link from "next/link";
 
 interface CropCardProps {
   crop: CropWithStats;
@@ -57,6 +59,9 @@ export function CropCard({ crop, onEdit, onMarkHarvested }: CropCardProps) {
   const archiveCrop = useMutation(api.crops.archiveCrop);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Fetch yield record to show in summary
+  const yieldRecord = useQuery(api.yields.getYieldByCrop, { cropId: crop._id });
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -186,7 +191,7 @@ export function CropCard({ crop, onEdit, onMarkHarvested }: CropCardProps) {
         </div>
 
         {/* Stats Summary */}
-        <div className="grid grid-cols-3 divide-x divide-border/50 border-t border-border/30 pt-4">
+        <div className="grid grid-cols-4 divide-x divide-border/50 border-t border-border/30 pt-4">
           <div className="text-center px-1">
             <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Expenses</p>
             <p className="text-sm font-bold text-foreground font-mono">{formatINR(crop.totalExpenses)}</p>
@@ -202,14 +207,42 @@ export function CropCard({ crop, onEdit, onMarkHarvested }: CropCardProps) {
               <p className={`text-sm font-bold font-mono ${crop.profit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
                 {crop.profit >= 0 ? "+" : ""}{formatINR(crop.profit)}
               </p>
-              {crop.totalExpenses > crop.totalSales && crop.totalSales > 0 && (
-                <span title="Expenses exceed sales">
-                  <AlertTriangle className="h-3 w-3 text-amber-500 ml-0.5" />
-                </span>
-              )}
             </div>
           </div>
+          <div className="text-center px-1 flex flex-col justify-center items-center">
+            <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Yield/Ac</p>
+            {yieldRecord === undefined ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : yieldRecord ? (
+              <p className="text-sm font-bold font-mono text-[#1C4E35]">
+                {yieldRecord.yieldPerAcreQuintal?.toFixed(1) || 0} q
+              </p>
+            ) : crop.status === "harvested" ? (
+              <Link href={`/dashboard/farms/${crop.farmId}/crops/${crop._id}`} onClick={(e) => e.stopPropagation()}>
+                <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 px-1 py-0 shadow-none text-[10px] gap-1 cursor-pointer hover:bg-amber-200 uppercase mt-0.5">
+                  Missing
+                </Badge>
+              </Link>
+            ) : (
+              <p className="text-sm font-bold text-muted-foreground/50">—</p>
+            )}
+          </div>
         </div>
+
+        {/* Expense Recovery Progress */}
+        {crop.status !== "archived" && crop.totalExpenses > 0 && crop.profit < 0 && (
+          <div className="space-y-1.5 px-1">
+            <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+              <span className="text-muted-foreground">Recovery</span>
+              <span className="text-secondary">{Math.min(100, Math.round((crop.totalSales / crop.totalExpenses) * 100))}%</span>
+            </div>
+            <Progress 
+              value={Math.min(100, (crop.totalSales / crop.totalExpenses) * 100)} 
+              className="h-1.5 bg-muted"
+              indicatorClassName="bg-secondary"
+            />
+          </div>
+        )}
       </CardContent>
 
       <CardFooter className="p-4 pt-0 gap-2 flex-wrap">

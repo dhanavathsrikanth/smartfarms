@@ -85,7 +85,7 @@ export function ExpenseTrendChart({ monthlyData }: ExpenseTrendChartProps) {
       <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
         Monthly Expense Trend
       </p>
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height={200} minWidth={0}>
         <BarChart
           data={chartData}
           barSize={28}

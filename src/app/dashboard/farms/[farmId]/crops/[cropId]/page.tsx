@@ -28,6 +28,8 @@ import {
   DollarSign,
   BarChart3,
   Plus,
+  ShoppingCart,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -81,17 +83,30 @@ import {
 } from "@/app/components/expenses";
 import { AddExpenseForm } from "@/app/components/expenses/AddExpenseForm";
 import { BulkExpenseDialog } from "@/app/components/expenses/BulkExpenseDialog";
-import {
-  SaleList,
-  ProfitWaterfallChart,
-  AddSaleForm
-} from "@/app/components/sales";
+import { SaleList } from "@/app/components/sales/SaleList";
+import { ProfitWaterfallChart } from "@/app/components/sales/ProfitWaterfallChart";
+import { AddSaleForm } from "@/app/components/sales/AddSaleForm";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+// Yield UI Components
+import { YieldSummaryCard } from "@/app/components/yields/YieldSummaryCard";
+import { YieldVsBenchmarkCard } from "@/app/components/yields/YieldVsBenchmarkCard";
+import { YieldTrendChart } from "@/app/components/yields/YieldTrendChart";
+import { YieldRecordForm } from "@/app/components/yields/YieldRecordForm";
+
+// Analytics UI Components
+import { SeasonComparisonChart } from "@/app/components/analytics/SeasonComparisonChart";
+import { InputOutputRadarChart } from "@/app/components/analytics/InputOutputRadarChart";
+import { ExpenseVsRevenueBar } from "@/app/components/analytics/ExpenseVsRevenueBar";
+import { ProfitMarginGauge } from "@/app/components/analytics/ProfitMarginGauge";
+import { BreakEvenProgressBar } from "@/app/components/analytics/BreakEvenProgressBar";
+import { CropGradeCard } from "@/app/components/analytics/CropGradeCard";
+
 import {
   BarChart,
   Bar,
@@ -152,6 +167,15 @@ function CropDetailContent() {
   const expenseSummary = useQuery(api.expenses.getExpenseSummaryByCrop, { cropId });
   const saleSummary = useQuery(api.sales.getSaleSummaryByCrop, { cropId });
   const profitTimeline = useQuery(api.sales.getSalesVsExpensesTimeline, { cropId });
+
+  // Advanced Analytics
+  const analyticsReport = useQuery(api.analytics.getDetailedCropProfitReport, { cropId });
+  const seasonComparison = useQuery(api.analytics.getSeasonComparison, crop ? { cropName: crop.name } : "skip" as any);
+
+  // Yield Data Module
+  const yieldData = useQuery(api.yields.getYieldByCrop, { cropId });
+  const trendData = useQuery(api.yields.getYieldTrendByCropName, crop ? { cropName: crop.name, farmId } : "skip" as any);
+  const yieldBench = useQuery(api.yields.getYieldBenchmarkComparison, crop ? { cropName: crop.name } : "skip" as any);
 
   // Mutations
   const archiveCrop = useMutation(api.crops.archiveCrop);
@@ -502,6 +526,10 @@ function CropDetailContent() {
                   <Bug className="h-3.5 w-3.5" />
                   Pest Log
                 </TabsTrigger>
+                <TabsTrigger value="analytics" className="gap-1.5 px-4 rounded-lg text-sm font-bold text-[#1C4E35] bg-[#F7F0E3]">
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  Analytics
+                </TabsTrigger>
               </TabsList>
 
               {/* ── Tab 1: Overview ── */}
@@ -788,16 +816,164 @@ function CropDetailContent() {
 
               {/* ── Tab 4: Yield ── */}
               <TabsContent value="yield" className="focus-visible:outline-none">
-                <PlaceholderTab
-                  module="Yield Analytics"
-                  description="Coming in Module 6. Visualize yield per acre, benchmark against market averages, and forecast revenue."
-                  icon={<Wheat className="h-10 w-10 text-amber-400" />}
-                />
+                {crop.status === "active" ? (
+                  <div className="flex flex-col items-center justify-center py-16 px-6 bg-blue-50/50 border border-blue-100 rounded-3xl text-center space-y-4 shadow-sm">
+                    <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Clock className="h-8 w-8 text-blue-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Crop is Growing</h3>
+                    <p className="text-gray-500 max-w-sm">Yield can only be recorded after the crop is harvested. Mark this cycle as harvested to unlock yield tracking.</p>
+                    <Button onClick={() => setHarvestOpen(true)} className="mt-4 gap-2 shadow-sm">
+                      <Wheat className="h-4 w-4" />
+                      Mark as Harvested
+                    </Button>
+                  </div>
+                ) : crop.status === "harvested" && !yieldData ? (
+                  <div className="border border-amber-200 bg-amber-50 rounded-2xl p-6 sm:p-10 mb-8 max-w-3xl mx-auto shadow-sm">
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="h-16 w-16 bg-amber-100 rounded-full flex items-center justify-center">
+                        <AlertTriangle className="h-8 w-8 text-amber-600" />
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900">Missing Yield Data</h3>
+                      <p className="text-gray-600 max-w-md">This crop is marked as harvested, but no yield data has been recorded. Please enter the final yield below to update your analytics and efficiency metrics.</p>
+                      
+                      <div className="w-full text-left bg-white p-6 rounded-xl border border-gray-200 mt-6 shadow-sm">
+                        <YieldRecordForm 
+                          cropId={cropId} 
+                          cropName={crop.name} 
+                          cropArea={crop.area} 
+                          areaUnit={crop.areaUnit} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : yieldData ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="space-y-6">
+                       <YieldSummaryCard yieldData={yieldData} cropData={crop} />
+                       {yieldBench && (
+                         <div className="bg-white rounded-xl border p-5 shadow-sm">
+                           <h3 className="text-sm font-bold text-gray-900 mb-4 border-b pb-2 flex items-center gap-2">
+                             <BarChart3 className="h-4 w-4 text-gray-500"/> National Benchmark
+                           </h3>
+                           <YieldVsBenchmarkCard benchmarkData={{
+                             farmerYieldPerAcre: yieldBench.farmerYieldPerAcre,
+                             nationalAvgPerAcre: yieldBench.nationalAvgPerAcre,
+                             differencePercent: yieldBench.differencePercent ?? null,
+                             performanceLabel: (yieldBench.performanceLabel as any) ?? null,
+                             gapToClose: yieldBench.gapToClose ?? null,
+                             potentialExtraRevenue: yieldBench.potentialExtraRevenue ?? null,
+                             message: (yieldBench as any).message
+                           }} />
+                         </div>
+                       )}
+                    </div>
+                    <div className="space-y-6">
+                      {trendData && trendData.trend.length > 1 && (
+                        <div className="bg-white rounded-xl border shadow-sm">
+                           <YieldTrendChart data={trendData} />
+                        </div>
+                      )}
+                      {photos && photos.length > 0 && (
+                        <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                           <div className="p-4 border-b bg-gray-50/50">
+                             <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                               <ImageIcon className="h-4 w-4 text-gray-500"/> Harvest Gallery
+                             </h3>
+                           </div>
+                           <div className="p-4 flex gap-3 overflow-x-auto no-scrollbar">
+                             {photos.map(p => (
+                               <div key={p._id} className="relative group shrink-0">
+                                 <img src={p.photoUrl} alt={p.caption || "harvest"} className="h-28 w-28 rounded-lg object-cover border" />
+                                 {p.caption && (
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-end p-2">
+                                       <span className="text-[10px] text-white line-clamp-2 leading-tight">{p.caption}</span>
+                                    </div>
+                                 )}
+                               </div>
+                             ))}
+                           </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-[#1C4E35]" /></div>
+                )}
               </TabsContent>
 
               {/* ── Tab 5: Photo Diary ── */}
               <TabsContent value="diary" className="focus-visible:outline-none">
                 <CropPhotoDiary cropId={cropId} />
+              </TabsContent>
+
+              {/* ── Tab 6: Analytics ── */}
+              <TabsContent value="analytics" className="focus-visible:outline-none space-y-6">
+                {!analyticsReport ? (
+                  <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-[#1C4E35]" /></div>
+                ) : (
+                  <>
+                    <ExpenseVsRevenueBar expenses={analyticsReport.financial.totalExpenses} revenue={analyticsReport.financial.totalRevenue} />
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="p-4 bg-white border border-[#e5dfd4] rounded-xl shadow-sm flex flex-col items-center justify-center">
+                        <ProfitMarginGauge margin={analyticsReport.financial.netProfitMargin} />
+                      </div>
+                      <div className="p-4 bg-white border border-[#e5dfd4] rounded-xl shadow-sm flex flex-col justify-center space-y-2">
+                        <h3 className="font-semibold text-sm text-gray-800">Growth Viability</h3>
+                        <BreakEvenProgressBar data={{
+                          breakEvenAchieved: analyticsReport.financial.totalRevenue >= analyticsReport.financial.totalExpenses,
+                          breakEvenProgressPercent: analyticsReport.financial.totalExpenses > 0 ? Math.min(100, (analyticsReport.financial.totalRevenue / analyticsReport.financial.totalExpenses) * 100) : 0,
+                          revenueSoFar: analyticsReport.financial.totalRevenue,
+                          remainingWeightToBreakEven: Math.max(0, (analyticsReport.financial.totalExpenses - analyticsReport.financial.totalRevenue) / (analyticsReport.financial.actualRateAchievedPerKg || 1)),
+                          breakEvenRatePerKg: analyticsReport.financial.breakEvenRatePerKg
+                        }} />
+                        <div className="text-xs text-gray-500 pt-2 border-t mt-4">
+                           Rate achieved: {analyticsReport.financial.actualRateAchievedPerKg ? formatINR(analyticsReport.financial.actualRateAchievedPerKg) : "N/A"} /kg<br/>
+                           Break-even rate: {analyticsReport.financial.breakEvenRatePerKg ? formatINR(analyticsReport.financial.breakEvenRatePerKg) : "N/A"} /kg
+                        </div>
+                      </div>
+                      <div className="flex h-full"> 
+                        <CropGradeCard data={{
+                          grade: (analyticsReport.financial.totalRevenue > 0 && analyticsReport.financial.totalExpenses / analyticsReport.financial.totalRevenue < 0.5) ? "A" : 
+                                (analyticsReport.financial.totalRevenue > 0 && analyticsReport.financial.totalExpenses / analyticsReport.financial.totalRevenue <= 0.7) ? "B" :
+                                (analyticsReport.financial.totalRevenue > 0 && analyticsReport.financial.totalExpenses / analyticsReport.financial.totalRevenue <= 1.0) ? "C" : "D",
+                          inputOutputRatio: analyticsReport.financial.totalRevenue > 0 ? analyticsReport.financial.totalExpenses / analyticsReport.financial.totalRevenue : (analyticsReport.financial.totalExpenses > 0 ? 100 : 0),
+                          expensesPerKgYield: analyticsReport.yield.totalYieldKg > 0 ? analyticsReport.financial.totalExpenses / analyticsReport.yield.totalYieldKg : 0,
+                          revenuePerKgYield: analyticsReport.yield.totalYieldKg > 0 ? analyticsReport.financial.totalRevenue / analyticsReport.yield.totalYieldKg : 0,
+                          netPerKg: analyticsReport.yield.totalYieldKg > 0 ? (analyticsReport.financial.totalRevenue - analyticsReport.financial.totalExpenses) / analyticsReport.yield.totalYieldKg : 0,
+                        }} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                       <SeasonComparisonChart cropName={crop.name} data={seasonComparison || []} />
+                       
+                       {analyticsReport.comparison.vsLastSameCrop ? (
+                         <div className="p-5 bg-white border border-[#e5dfd4] rounded-xl shadow-sm">
+                           <h3 className="font-bold text-gray-800 mb-2">VS Last Season</h3>
+                           <p className="text-xs text-gray-500 mb-4">Radar metric charting for current vs previous identical crop.</p>
+                           <InputOutputRadarChart data={[
+                             { subject: "Profit", current: analyticsReport.financial.grossProfit, previous: analyticsReport.comparison.vsLastSameCrop.lastSeasonProfit, fullMark: Math.max(analyticsReport.financial.grossProfit, analyticsReport.comparison.vsLastSameCrop.lastSeasonProfit) },
+                             { subject: "ROI %", current: analyticsReport.financial.roiPercent, previous: (analyticsReport.comparison.vsLastSameCrop.lastSeasonProfit / (analyticsReport.financial.totalExpenses || 1)) * 100, fullMark: 100 },
+                             { subject: "Yield /Ac", current: analyticsReport.yield.yieldPerAcre, previous: 0, fullMark: 100 },
+                           ]} />
+                         </div>
+                       ) : (
+                        <Card className="shadow-sm border-border/50">
+                          <CardHeader className="pb-3 px-6">
+                            <CardTitle className="text-base font-bold flex items-center gap-2">
+                              <TrendingUp className="h-4 w-4 text-emerald-600" /> Waterfall
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="h-80 w-full pt-2">
+                            <ProfitWaterfallChart timelineEvents={profitTimeline} />
+                          </CardContent>
+                        </Card>
+                       )}
+                    </div>
+                  </>
+                )}
               </TabsContent>
 
               {/* ── Tab 6: Pest Log ── */}

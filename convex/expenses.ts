@@ -505,14 +505,17 @@ export const getExpenseSummaryAllFarms = query({
       };
     }
 
-    const byCategory: Record<string, number> = {};
+    const byCategory: Record<string, { total: number; count: number }> = {};
     const byFarmMap: Record<string, { farmId: Id<"farms">; total: number }> = {};
     const byMonthMap: Record<string, { month: number; year: number; totalAmount: number }> = {};
     let totalExpenses = 0;
 
     for (const exp of expenses) {
       totalExpenses += exp.amount;
-      byCategory[exp.category] = (byCategory[exp.category] ?? 0) + exp.amount;
+      
+      if (!byCategory[exp.category]) byCategory[exp.category] = { total: 0, count: 0 };
+      byCategory[exp.category].total += exp.amount;
+      byCategory[exp.category].count += 1;
 
       // By farm aggregation
       const fk = exp.farmId as string;
@@ -554,6 +557,7 @@ export const getExpenseSummaryAllFarms = query({
       byFarm: byFarm.sort((a, b) => b.totalExpenses - a.totalExpenses),
       byMonth,
       monthlyAverage,
+      expenseCount: expenses.length,
     };
   },
 });

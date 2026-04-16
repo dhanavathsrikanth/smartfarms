@@ -497,6 +497,7 @@ export const getSaleSummaryAllFarms = query({
 
     let totalRevenue = 0;
     let totalPendingAmount = 0;
+    let totalPendingCount = 0;
     const bySaleType: Record<string, number> = {};
     const farmStats: Record<string, { farmId: Id<"farms">; totalRevenue: number }> = {};
     const monthlyMap: Record<string, { month: number; year: number; totalAmount: number }> = {};
@@ -505,7 +506,10 @@ export const getSaleSummaryAllFarms = query({
 
     for (const sale of sales) {
       totalRevenue += sale.totalAmount;
-      if (sale.paymentStatus !== "paid") totalPendingAmount += sale.totalAmount;
+      if (sale.paymentStatus !== "paid") {
+        totalPendingAmount += sale.totalAmount;
+        totalPendingCount += 1;
+      }
 
       bySaleType[sale.saleType] =
         (bySaleType[sale.saleType] ?? 0) + sale.totalAmount;
@@ -597,6 +601,7 @@ export const getSaleSummaryAllFarms = query({
     return {
       totalRevenue,
       totalPendingAmount,
+      totalPendingCount,
       bySaleType,
       byFarm: byFarm.sort((a, b) => b.totalRevenue - a.totalRevenue),
       monthlyRevenue: byMonth,

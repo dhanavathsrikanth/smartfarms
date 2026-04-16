@@ -1,13 +1,31 @@
+"use client";
+
 import { Phone, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 export function BuyerCard({ buyer, onEdit, onDelete }: { buyer: any, onEdit?: (b: any) => void, onDelete?: (b: any) => void }) {
+  const rateBuyer = useMutation(api.sales.rateBuyer);
+
+  const handleRate = async (newRating: number) => {
+    try {
+      await rateBuyer({ buyerId: buyer._id, rating: newRating });
+    } catch {
+      // toast error would be good here
+    }
+  };
+
   const renderStars = () => {
     const rating = buyer.rating || 0;
     return (
       <div className="flex items-center gap-0.5">
         {[1,2,3,4,5].map(i => (
-          <Star key={i} className={`w-3 h-3 ${i <= rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
+          <Star 
+            key={i} 
+            className={`w-3 h-3 cursor-pointer transition-transform hover:scale-125 ${i <= rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground hover:text-amber-300"}`} 
+            onClick={() => handleRate(i)}
+          />
         ))}
       </div>
     );

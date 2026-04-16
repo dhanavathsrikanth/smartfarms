@@ -10,6 +10,8 @@ import { CropCalendar } from "@/components/crops/CropCalendar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BreakEvenCalculator } from "@/app/components/analytics/BreakEvenCalculator";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { 
   Plus, 
   Sprout, 
@@ -21,7 +23,8 @@ import {
   LayoutGrid,
   CalendarDays,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Calculator as CalcIcon
 } from "lucide-react";
 import Link from "next/link";
 import { formatINR } from "@/lib/utils";
@@ -45,6 +48,7 @@ export default function AllCropsPage() {
 
 function AllCropsContent() {
   const [createOpen, setCreateOpen] = useState(false);
+  const [plannerOpen, setPlannerOpen] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const stats = useQuery(api.crops.getCropSummaryStats);
   const crops = useQuery(api.crops.listAllCrops);
@@ -73,13 +77,32 @@ function AllCropsContent() {
           <p className="text-muted-foreground text-sm">Monitor cultivation cycles across all your farms.</p>
         </div>
         
-        <Button 
-          className="btn-secondary-branding gap-2 h-11 px-6 shadow-lg shadow-secondary/10"
-          onClick={() => setCreateOpen(true)}
-        >
-          <Plus className="h-5 w-5" />
-          <span className="font-semibold">Register New Crop</span>
-        </Button>
+        <div className="flex items-center gap-3">
+          <Dialog open={plannerOpen} onOpenChange={setPlannerOpen}>
+            <DialogTrigger 
+              render={
+                <Button 
+                  variant="outline"
+                  className="hidden md:flex gap-2 h-11 px-5 border-secondary/20 text-secondary hover:bg-secondary/5 font-semibold"
+                >
+                  <CalcIcon className="h-5 w-5" />
+                  Simulate Profit
+                </Button>
+              }
+            />
+            <DialogContent className="max-w-4xl p-0 border-none bg-transparent shadow-none">
+              <BreakEvenCalculator onSaveSuccess={() => setPlannerOpen(false)} />
+            </DialogContent>
+          </Dialog>
+
+          <Button 
+            className="btn-secondary-branding gap-2 h-11 px-6 shadow-lg shadow-secondary/10"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus className="h-5 w-5" />
+            <span className="font-semibold">Register New Crop</span>
+          </Button>
+        </div>
       </div>
 
       {/* ── Stats Overview ── */}

@@ -13,7 +13,13 @@ import { CropGrid } from "@/components/crops/CropGrid";
 import type { EditableFarm } from "@/types/farm";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Tabs,
   TabsList,
@@ -46,9 +52,12 @@ import {
   ChevronRight,
   Plus,
   Receipt,
+  BarChart3,
+  TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { formatINR } from "@/lib/utils";
 import {
   ExpenseList,
   ExpenseSummaryCard,
@@ -62,7 +71,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SaleList, SalesRevenueChart } from "@/app/components/sales";
+import { SaleList } from "@/app/components/sales/SaleList";
+import { SalesRevenueChart } from "@/app/components/sales/SalesRevenueChart";
 
 export default function FarmDetailPage() {
   useStoreUserEffect();
@@ -98,6 +108,7 @@ function FarmDetailContent({ farmId }: { farmId: Id<"farms"> }) {
 
   const expenseSummary = useQuery(api.expenses.getExpenseSummaryByFarm, { farmId });
   const saleSummary = useQuery(api.sales.getSaleSummaryByFarm, { farmId });
+  const yieldSummary = useQuery(api.yields.getYieldSummaryByFarm, { farmId });
 
   const handleArchive = async () => {
     setArchiving(true);
@@ -243,9 +254,22 @@ function FarmDetailContent({ farmId }: { farmId: Id<"farms"> }) {
         </div>
       </div>
 
+      {/* ── Missing Yield Warning Banner ── */}
+      {yieldSummary && yieldSummary.cropsWithoutYield > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-sm animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-start md:items-center gap-3">
+             <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5 md:mt-0" />
+             <div className="text-sm">
+               <p className="font-bold text-amber-800">{yieldSummary.cropsWithoutYield} Harvested crop(s) missing yield data</p>
+               <p className="opacity-80 font-medium">Efficiency matrix and overall performance stats are inaccurate without yield data.</p>
+             </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Stats Bar ── */}
-      {stats ? (
-        <FarmStatsBar stats={stats} />
+      {stats && yieldSummary !== undefined ? (
+        <FarmStatsBar stats={stats} yieldSummary={yieldSummary} />
       ) : (
         <FarmStatsBarSkeleton />
       )}
@@ -311,6 +335,9 @@ function FarmDetailContent({ farmId }: { farmId: Id<"farms"> }) {
           </TabsTrigger>
           <TabsTrigger value="labour" className="gap-1.5">
             <Users className="h-4 w-4" /> Labour
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="gap-1.5 font-bold text-[#1C4E35] bg-[#F7F0E3]">
+            <BarChart3 className="h-4 w-4" /> Analytics
           </TabsTrigger>
         </TabsList>
 
@@ -465,6 +492,25 @@ function FarmDetailContent({ farmId }: { farmId: Id<"farms"> }) {
             description="Manage daily labour attendance, wages, and task assignments for permanent, seasonal, and contract workers."
             badge="Coming Soon"
           />
+        </TabsContent>
+
+        {/* Analytics Tab */}
+        <TabsContent value="analytics" className="mt-4 space-y-6">
+          <div className="flex flex-col md:flex-row items-center justify-between bg-[#1C4E35] p-6 rounded-xl shadow-md border border-[#e5dfd4] gap-4">
+            <div>
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <BarChart3 className="h-6 w-6 text-[#52A870]" /> Advanced Analytical Dashboard
+              </h3>
+              <p className="text-sm text-[#F7F0E3] mt-2 opacity-90 max-w-lg">
+                Access deep financial insights, crop performance rankings, cost distribution heatmaps, and year-over-year operational trends specific to {farm.name}.
+              </p>
+            </div>
+            <Link href={`/dashboard/farms/${farmId}/analytics`} className="shrink-0">
+              <Button className="bg-[#D4840A] hover:bg-[#b56e09] text-white font-bold border-none shadow-sm gap-2 px-6 py-6 h-auto rounded-lg">
+                Enter Analytics <TrendingUp className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
         </TabsContent>
       </Tabs>
 
