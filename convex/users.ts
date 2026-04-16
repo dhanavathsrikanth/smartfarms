@@ -33,19 +33,20 @@ export const store = mutation({
 
     const publicMetadata = identity.publicMetadata as any;
 
-    const userProps = {
+    // Only include fields that are actually present in the JWT to avoid
+    // overwriting good webhook data with empty values
+    const userProps: Record<string, any> = {
       name: identity.name ?? "Anonymous",
       tokenIdentifier: identity.tokenIdentifier,
       externalId: identity.subject,
-      email: identity.email ?? "",
-      firstName: identity.givenName,
-      lastName: identity.familyName,
-      imageUrl: identity.pictureUrl,
-      username: identity.nickname,
-      // Comprehensive Timestamps & Metadata
-      publicMetadata: publicMetadata,
-      role: publicMetadata?.role ?? undefined,
     };
+    if (identity.email)      userProps.email     = identity.email;
+    if (identity.givenName)  userProps.firstName = identity.givenName;
+    if (identity.familyName) userProps.lastName  = identity.familyName;
+    if (identity.pictureUrl) userProps.imageUrl  = identity.pictureUrl;
+    if (identity.nickname)   userProps.username  = identity.nickname;
+    if (publicMetadata)      userProps.publicMetadata = publicMetadata;
+    if (publicMetadata?.role) userProps.role     = publicMetadata.role;
 
     if (user !== null) {
       await ctx.db.patch(user._id, userProps);
