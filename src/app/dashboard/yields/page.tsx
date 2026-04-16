@@ -243,7 +243,7 @@ function YieldsDashboard() {
 
 function FilterSelect({ value, options, onChange }: { value: string, options: {label: string, value: string}[], onChange: (v: string) => void }) {
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} onValueChange={(v) => v !== null && onChange(v)}>
       <SelectTrigger className="border-none bg-transparent shadow-none focus:ring-0 font-semibold p-0 pr-1 h-7">
         <SelectValue />
       </SelectTrigger>

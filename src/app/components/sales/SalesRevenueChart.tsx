@@ -40,8 +40,8 @@ export function SalesRevenueChart({ monthlyRevenue = [], monthlyExpenses = [] }:
           <XAxis dataKey="monthName" axisLine={false} tickLine={false} fontSize={12} tickMargin={8} />
           <YAxis axisLine={false} tickLine={false} fontSize={12} tickFormatter={formatCurrency} width={50} />
           <Tooltip
-            formatter={(value: number, name: string) => [
-              `₹${value.toLocaleString()}`, 
+            formatter={(value: any, name: any) => [
+              `₹${Number(value).toLocaleString()}`, 
               name === "totalAmount" ? "Revenue" : name === "expenses" ? "Expenses" : "Profit"
             ]}
             labelFormatter={(label, payload) => payload?.[0]?.payload?.year ? `${label} ${payload[0].payload.year}` : label}

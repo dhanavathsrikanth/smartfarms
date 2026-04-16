@@ -116,8 +116,7 @@ export function YieldRecordForm({ cropId, cropName, cropArea, areaUnit, onSucces
             />
             <div className="w-1/2">
               <ToggleGroup 
-                type="single" 
-                value={yieldUnit} 
+                value={yieldUnit as any} 
                 onValueChange={(val: any) => val && setYieldUnit(val)}
                 className="justify-start h-14 bg-muted/50 p-1 rounded-md"
               >

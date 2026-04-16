@@ -13,7 +13,7 @@ interface LargestExpense {
 
 interface SummaryData {
   totalAmount: number;
-  byCategory: Record<string, number>;
+  byCategory: Record<string, { total: number; count: number }>;
   expenseCount: number;
   largestExpense: LargestExpense | null;
   averageExpenseAmount: number;

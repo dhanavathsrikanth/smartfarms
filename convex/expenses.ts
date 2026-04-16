@@ -356,7 +356,7 @@ export const getExpenseSummaryByCrop = query({
     if (expenses.length === 0) {
       return {
         totalAmount: 0,
-        byCategory: {} as Record<string, number>,
+        byCategory: {} as Record<string, { total: number; count: number }>,
         expenseCount: 0,
         largestExpense: null,
         averageExpenseAmount: 0,
@@ -364,18 +364,20 @@ export const getExpenseSummaryByCrop = query({
       };
     }
 
-    const byCategory: Record<string, number> = {};
+    const byCategory: Record<string, { total: number; count: number }> = {};
     let totalAmount = 0;
     let largestExpense = expenses[0];
 
     for (const exp of expenses) {
       totalAmount += exp.amount;
-      byCategory[exp.category] = (byCategory[exp.category] ?? 0) + exp.amount;
+      if (!byCategory[exp.category]) byCategory[exp.category] = { total: 0, count: 0 };
+      byCategory[exp.category].total += exp.amount;
+      byCategory[exp.category].count += 1;
       if (exp.amount > largestExpense.amount) largestExpense = exp;
     }
 
     const mostExpensiveCategory = Object.entries(byCategory).sort(
-      (a, b) => b[1] - a[1]
+      (a, b) => b[1].total - a[1].total
     )[0][0];
 
     return {
@@ -418,7 +420,7 @@ export const getExpenseSummaryByFarm = query({
     if (expenses.length === 0) {
       return {
         totalAmount: 0,
-        byCategory: {} as Record<string, number>,
+        byCategory: {} as Record<string, { total: number; count: number }>,
         expenseCount: 0,
         largestExpense: null,
         averageExpenseAmount: 0,
@@ -431,14 +433,17 @@ export const getExpenseSummaryByFarm = query({
       };
     }
 
-    const byCategory: Record<string, number> = {};
+    const byCategory: Record<string, { total: number; count: number }> = {};
     const byCrop: Record<string, { cropId: Id<"crops">; total: number }> = {};
     let totalAmount = 0;
     let largestExpense = expenses[0];
 
     for (const exp of expenses) {
       totalAmount += exp.amount;
-      byCategory[exp.category] = (byCategory[exp.category] ?? 0) + exp.amount;
+      if (!byCategory[exp.category]) byCategory[exp.category] = { total: 0, count: 0 };
+      byCategory[exp.category].total += exp.amount;
+      byCategory[exp.category].count += 1;
+
       if (!byCrop[exp.cropId]) {
         byCrop[exp.cropId] = { cropId: exp.cropId, total: 0 };
       }
@@ -447,7 +452,7 @@ export const getExpenseSummaryByFarm = query({
     }
 
     const mostExpensiveCategory = Object.entries(byCategory).sort(
-      (a, b) => b[1] - a[1]
+      (a, b) => b[1].total - a[1].total
     )[0][0];
 
     // Resolve crop names
@@ -498,7 +503,7 @@ export const getExpenseSummaryAllFarms = query({
     if (expenses.length === 0) {
       return {
         totalExpenses: 0,
-        byCategory: {} as Record<string, number>,
+        byCategory: {} as Record<string, { total: number; count: number }>,
         byFarm: [] as Array<{ farmId: Id<"farms">; farmName: string; totalExpenses: number }>,
         byMonth: [] as Array<{ month: number; year: number; totalAmount: number }>,
         monthlyAverage: 0,

@@ -217,13 +217,13 @@ function ExpensesContent() {
               <div className="flex flex-col gap-1 mt-1">
                 <ExpenseCategoryBadge
                   category={
-                    Object.entries(summaryAll.byCategory).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "other"
+                    Object.entries(summaryAll.byCategory).sort((a, b) => b[1].total - a[1].total)[0]?.[0] ?? "other"
                   }
                   size="sm"
                 />
                 <span className="text-xs font-mono font-bold text-foreground">
                   {formatINR(
-                    Object.entries(summaryAll.byCategory).sort((a, b) => b[1] - a[1])[0]?.[1] ?? 0
+                    Object.entries(summaryAll.byCategory).sort((a, b) => b[1].total - a[1].total)[0]?.[1].total ?? 0
                   )}
                 </span>
               </div>

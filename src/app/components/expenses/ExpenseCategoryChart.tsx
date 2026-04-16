@@ -13,7 +13,7 @@ import { formatINR } from "@/lib/utils";
 
 interface SummaryData {
   totalAmount: number;
-  byCategory: Record<string, number>;
+  byCategory: Record<string, { total: number; count: number }>;
   expenseCount: number;
 }
 
@@ -25,14 +25,15 @@ export function ExpenseCategoryChart({ summaryData }: ExpenseCategoryChartProps)
   const { totalAmount, byCategory } = summaryData;
 
   const data = Object.entries(byCategory)
-    .filter(([, v]) => v > 0)
-    .sort((a, b) => b[1] - a[1])
-    .map(([category, amount]) => ({
+    .filter(([, v]) => v.total > 0)
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([category, stats]) => ({
       name: category.charAt(0).toUpperCase() + category.slice(1),
-      value: amount,
+      value: stats.total,
+      count: stats.count,
       category,
       fill: getCategoryColor(category),
-      pct: totalAmount > 0 ? ((amount / totalAmount) * 100).toFixed(1) : "0",
+      pct: totalAmount > 0 ? ((stats.total / totalAmount) * 100).toFixed(1) : "0",
     }));
 
   if (data.length === 0) {

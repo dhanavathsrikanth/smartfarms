@@ -480,7 +480,7 @@ export const getYieldTrendByCropName = query({
 export const getYieldBenchmarkComparison = query({
   args: {
     cropName: v.string(),
-    state:    v.string(), // reserved for future state-level benchmarks
+    state:    v.optional(v.string()), // reserved for future state-level benchmarks
   },
   handler: async (ctx, { cropName }) => {
     const userId = await requireUserId(ctx);
@@ -495,7 +495,7 @@ export const getYieldBenchmarkComparison = query({
       .collect();
 
     if (crops.length === 0) {
-      return { farmerYieldPerAcre: null, nationalAvgPerAcre: benchmark, message: "No crops found with this name." };
+      return { farmerYieldPerAcre: null, nationalAvgPerAcre: benchmark, differencePercent: null, performanceLabel: null, gapToClose: null, potentialExtraRevenue: null, message: "No crops found with this name." };
     }
 
     // Find the most recent yield
@@ -513,13 +513,13 @@ export const getYieldBenchmarkComparison = query({
     }
 
     if (!latestYield) {
-      return { farmerYieldPerAcre: null, nationalAvgPerAcre: benchmark, message: "No yield recorded for this crop yet." };
+      return { farmerYieldPerAcre: null, nationalAvgPerAcre: benchmark, differencePercent: null, performanceLabel: null, gapToClose: null, potentialExtraRevenue: null, message: "No yield recorded for this crop yet." };
     }
 
     const farmerYieldPerAcre = latestYield.yieldPerAcre; // kg/acre
 
     if (!benchmark) {
-      return { farmerYieldPerAcre, nationalAvgPerAcre: null, message: "No benchmark data available for this crop." };
+      return { farmerYieldPerAcre, nationalAvgPerAcre: null, differencePercent: null, performanceLabel: null, gapToClose: null, potentialExtraRevenue: null, message: "No benchmark data available for this crop." };
     }
 
     const differencePercent = ((farmerYieldPerAcre - benchmark) / benchmark) * 100;
