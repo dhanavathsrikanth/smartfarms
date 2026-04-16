@@ -33,27 +33,30 @@ export const store = mutation({
 
     const publicMetadata = identity.publicMetadata as any;
 
-    // Only include fields that are actually present in the JWT to avoid
-    // overwriting good webhook data with empty values
-    const userProps: Record<string, any> = {
+    // Base props always present
+    const baseProps = {
       name: identity.name ?? "Anonymous",
       tokenIdentifier: identity.tokenIdentifier,
       externalId: identity.subject,
+      email: identity.email ?? "",
     };
-    if (identity.email)      userProps.email     = identity.email;
-    if (identity.givenName)  userProps.firstName = identity.givenName;
-    if (identity.familyName) userProps.lastName  = identity.familyName;
-    if (identity.pictureUrl) userProps.imageUrl  = identity.pictureUrl;
-    if (identity.nickname)   userProps.username  = identity.nickname;
-    if (publicMetadata)      userProps.publicMetadata = publicMetadata;
-    if (publicMetadata?.role) userProps.role     = publicMetadata.role;
+
+    // Optional props — only set if present in JWT to avoid overwriting webhook data
+    const optionalProps = {
+      ...(identity.givenName   && { firstName: identity.givenName }),
+      ...(identity.familyName  && { lastName: identity.familyName }),
+      ...(identity.pictureUrl  && { imageUrl: identity.pictureUrl }),
+      ...(identity.nickname    && { username: identity.nickname }),
+      ...(publicMetadata       && { publicMetadata }),
+      ...(publicMetadata?.role && { role: publicMetadata.role }),
+    };
 
     if (user !== null) {
-      await ctx.db.patch(user._id, userProps);
+      await ctx.db.patch(user._id, { ...baseProps, ...optionalProps });
       return user._id;
     }
 
-    return await ctx.db.insert("users", userProps);
+    return await ctx.db.insert("users", { ...baseProps, ...optionalProps });
   },
 });
 
@@ -118,8 +121,48 @@ export const deleteFromClerk = internalMutation({
 });
 
 /**
- * Helper: Get Current User or Throw
+ * Backfill Mutation — run once to fix existing users with empty fields
+ * by fetching real data from Clerk's API.
+ * Call via: npx convex run users:backfillFromClerk
  */
+export const backfillFromClerk = internalMutation({
+  args: {},
+  async handler(ctx) {
+    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+    if (!clerkSecretKey) throw new Error("CLERK_SECRET_KEY not set");
+
+    const users = await ctx.db.query("users").collect();
+
+    for (const user of users) {
+      // Only backfill rows that are missing data
+      if (user.firstName && user.email && user.email !== "") continue;
+
+      const res = await fetch(`https://api.clerk.com/v1/users/${user.externalId}`, {
+        headers: { Authorization: `Bearer ${clerkSecretKey}` },
+      });
+      if (!res.ok) {
+        console.warn(`Failed to fetch Clerk user ${user.externalId}: ${res.status}`);
+        continue;
+      }
+
+      const data = await res.json();
+      const primaryEmail = data.email_addresses?.find(
+        (e: any) => e.id === data.primary_email_address_id
+      )?.email_address ?? data.email_addresses?.[0]?.email_address ?? "";
+
+      await ctx.db.patch(user._id, {
+        email: primaryEmail || user.email,
+        firstName: data.first_name ?? user.firstName,
+        lastName: data.last_name ?? user.lastName,
+        imageUrl: data.image_url ?? user.imageUrl,
+        username: data.username ?? user.username,
+        lastSignInAt: data.last_sign_in_at ?? user.lastSignInAt,
+        createdAt: data.created_at ?? user.createdAt,
+        name: `${data.first_name || ""} ${data.last_name || ""}`.trim() || user.name,
+      });
+    }
+  },
+});
 export async function getCurrentUserOrThrow(ctx: QueryCtx) {
   const userRecord = await getCurrentUser(ctx);
   if (!userRecord) throw new Error("Can't get current user");
