@@ -38,11 +38,11 @@ export const store = mutation({
       name: identity.name ?? "Anonymous",
       tokenIdentifier: identity.tokenIdentifier,
       externalId: identity.subject,
-      email: identity.email ?? "",
     };
 
     // Optional props — only set if present in JWT to avoid overwriting webhook data
     const optionalProps = {
+      ...(identity.email       && { email: identity.email }),
       ...(identity.givenName   && { firstName: identity.givenName }),
       ...(identity.familyName  && { lastName: identity.familyName }),
       ...(identity.pictureUrl  && { imageUrl: identity.pictureUrl }),
@@ -56,7 +56,8 @@ export const store = mutation({
       return user._id;
     }
 
-    return await ctx.db.insert("users", { ...baseProps, ...optionalProps });
+    // email is required in schema — use "" as placeholder until webhook fills it
+    return await ctx.db.insert("users", { email: "", ...baseProps, ...optionalProps });
   },
 });
 
