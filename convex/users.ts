@@ -194,3 +194,19 @@ async function userByExternalId(ctx: QueryCtx, externalId: string) {
     .withIndex("byExternalId", (q) => q.eq("externalId", externalId))
     .unique();
 }
+
+/**
+ * Admin: set role on any user by externalId.
+ * Only callable by existing admins (or run directly via Convex dashboard for bootstrap).
+ */
+export const setRole = internalMutation({
+  args: { externalId: v.string(), role: v.string() },
+  async handler(ctx, { externalId, role }) {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("byExternalId", (q) => q.eq("externalId", externalId))
+      .unique();
+    if (!user) throw new Error(`User not found: ${externalId}`);
+    await ctx.db.patch(user._id, { role });
+  },
+});

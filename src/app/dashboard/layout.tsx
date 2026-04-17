@@ -23,6 +23,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AlertsPanel } from "@/app/components/analytics/AlertsPanel";
@@ -68,6 +69,11 @@ export default function DashboardLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated } = useConvexAuth();
+
+  // Fetch current user to check admin role (Convex users table OR Clerk publicMetadata)
+  const currentUser = useQuery(api.users.current, isAuthenticated ? {} : "skip");
+  const { user: clerkUser } = useUser();
+  const isAdmin = currentUser?.role === "admin" || (clerkUser?.publicMetadata?.role as string) === "admin";
 
   const insights = useQuery(
     api.expenses.getExpenseInsights,
@@ -138,6 +144,13 @@ export default function DashboardLayout({
               }
             />
           ))}
+          {/* Admin-only nav item */}
+          {isAdmin && (
+            <NavLink
+              item={{ label: "Admin", href: "/dashboard/admin", icon: ShieldAlert }}
+              onNavigate={() => setSidebarOpen(false)}
+            />
+          )}
         </nav>
 
         {/* Sidebar Footer */}
