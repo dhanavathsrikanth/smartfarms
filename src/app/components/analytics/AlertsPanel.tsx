@@ -23,6 +23,8 @@ function alertIcon(title: string) {
   if (title.startsWith("📉")) return <TrendingDown className="h-4 w-4 text-amber-500" />;
   if (title.startsWith("⚠️ Pending")) return <Clock className="h-4 w-4 text-orange-500" />;
   if (title.startsWith("🎉")) return <Sparkles className="h-4 w-4 text-violet-500" />;
+  if (title.startsWith("👋")) return <Sparkles className="h-4 w-4 text-emerald-500" />;
+  if (title.startsWith("🚀") || title.startsWith("📢") || title.startsWith("🔔")) return <Bell className="h-4 w-4 text-blue-500" />;
   return <AlertTriangle className="h-4 w-4 text-blue-500" />;
 }
 
@@ -32,6 +34,8 @@ function alertBg(title: string): string {
   if (title.startsWith("📉")) return "border-l-amber-400 bg-amber-50 dark:bg-amber-950/20";
   if (title.startsWith("⚠️ Pending")) return "border-l-orange-400 bg-orange-50 dark:bg-orange-950/20";
   if (title.startsWith("🎉")) return "border-l-violet-400 bg-violet-50 dark:bg-violet-950/20";
+  if (title.startsWith("👋")) return "border-l-emerald-400 bg-emerald-50 dark:bg-emerald-950/20";
+  if (title.startsWith("🚀") || title.startsWith("📢") || title.startsWith("🔔")) return "border-l-blue-400 bg-blue-50 dark:bg-blue-950/20";
   return "border-l-blue-400 bg-blue-50 dark:bg-blue-950/20";
 }
 

@@ -1,6 +1,7 @@
 import { internalMutation, mutation, query, QueryCtx } from "./_generated/server";
 import { UserJSON } from "@clerk/backend";
 import { v, Validator } from "convex/values";
+import { internal } from "./_generated/api";
 
 /**
  * Current User Query
@@ -57,7 +58,10 @@ export const store = mutation({
     }
 
     // email is required in schema — use "" as placeholder until webhook fills it
-    return await ctx.db.insert("users", { email: "", ...baseProps, ...optionalProps });
+    const newId = await ctx.db.insert("users", { email: "", ...baseProps, ...optionalProps });
+    // Send welcome notification to new user
+    await ctx.scheduler.runAfter(0, internal.notifications.sendWelcome, { userId: identity.subject });
+    return newId;
   },
 });
 

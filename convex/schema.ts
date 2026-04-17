@@ -245,7 +245,9 @@ export default defineSchema({
       v.literal("low_stock"),
       v.literal("price_alert"),
       v.literal("weather"),
-      v.literal("ai_insight")
+      v.literal("ai_insight"),
+      v.literal("platform_update"),
+      v.literal("welcome")
     ),
     title: v.string(),
     message: v.string(),

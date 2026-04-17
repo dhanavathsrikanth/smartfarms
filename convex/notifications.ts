@@ -1,5 +1,5 @@
 import { v, ConvexError } from "convex/values";
-import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
+import { query, mutation, internalMutation, QueryCtx, MutationCtx } from "./_generated/server";
 
 async function getAuthenticatedUserId(ctx: QueryCtx | MutationCtx): Promise<string> {
   const identity = await ctx.auth.getUserIdentity();
@@ -70,5 +70,50 @@ export const markAllAsRead = mutation({
       .collect();
     await Promise.all(unread.map((n) => ctx.db.patch(n._id, { isRead: true })));
     return unread.length;
+  },
+});
+
+/**
+ * Send a welcome notification to a newly registered user.
+ * Called from users.store on first insert.
+ */
+export const sendWelcome = internalMutation({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    await ctx.db.insert("notifications", {
+      userId,
+      type: "welcome",
+      title: "👋 Welcome to KhetSmart!",
+      message: "Your farm management dashboard is ready. Start by adding your first farm, then track crops, expenses, sales and yields — all in one place.",
+      isRead: false,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Broadcast a platform update notification to all users.
+ * Run via: npx convex run notifications:broadcastPlatformUpdate --title "..." --message "..."
+ */
+export const broadcastPlatformUpdate = internalMutation({
+  args: {
+    title: v.string(),
+    message: v.string(),
+  },
+  handler: async (ctx, { title, message }) => {
+    const users = await ctx.db.query("users").collect();
+    await Promise.all(
+      users.map((u) =>
+        ctx.db.insert("notifications", {
+          userId: u.externalId,
+          type: "platform_update",
+          title,
+          message,
+          isRead: false,
+          createdAt: Date.now(),
+        })
+      )
+    );
+    return { sent: users.length };
   },
 });
