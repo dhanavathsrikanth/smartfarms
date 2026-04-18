@@ -107,10 +107,12 @@ export const updateExpense = mutation({
     const userId = await getAuthenticatedUserId(ctx);
     await verifyExpenseOwnership(ctx, expenseId, userId);
 
-    // Only patch fields that were explicitly supplied
     const patch: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(fields)) {
-      if (value !== undefined) patch[key] = value;
+      if (value !== undefined) {
+        // empty string on photoUrl means "remove photo"
+        patch[key] = (key === "photoUrl" && value === "") ? undefined : value;
+      }
     }
 
     await ctx.db.patch(expenseId, patch);

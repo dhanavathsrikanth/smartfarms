@@ -33,24 +33,44 @@ export function EditExpenseDialog({
   const handleSubmit = async (values: FormValues) => {
     if (!expense) return;
     try {
-      await updateExpense({
-        expenseId: expense._id,
-        category: values.category,
-        amount: values.amount,
-        date: values.date,
-        notes: values.notes,
-        supplier: values.supplier,
-      });
+      // Handle photo: null = removed, string starting with http = unchanged, other string = new storageId
+      let photoUrl: string | undefined = expense.photoUrl;
 
-      // Attach new photo if storageId was provided (not a URL)
-      if (
-        values.photoUrl &&
-        !values.photoUrl.startsWith("http") &&
-        values.photoUrl !== expense.photoUrl
-      ) {
+      if (values.photoUrl === null) {
+        // User removed the photo — clear it
+        photoUrl = undefined;
+        await updateExpense({
+          expenseId: expense._id,
+          category: values.category,
+          amount: values.amount,
+          date: values.date,
+          notes: values.notes,
+          supplier: values.supplier,
+          photoUrl: "",  // empty string signals removal
+        });
+      } else if (values.photoUrl && !values.photoUrl.startsWith("http")) {
+        // New storageId — attach and get URL
+        await updateExpense({
+          expenseId: expense._id,
+          category: values.category,
+          amount: values.amount,
+          date: values.date,
+          notes: values.notes,
+          supplier: values.supplier,
+        });
         await attachPhoto({
           expenseId: expense._id,
           storageId: values.photoUrl as Id<"_storage">,
+        });
+      } else {
+        // No photo change
+        await updateExpense({
+          expenseId: expense._id,
+          category: values.category,
+          amount: values.amount,
+          date: values.date,
+          notes: values.notes,
+          supplier: values.supplier,
         });
       }
 

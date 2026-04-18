@@ -67,7 +67,7 @@ export interface FormValues {
   date: string;
   notes?: string;
   supplier?: string;
-  photoUrl?: string;
+  photoUrl?: string | null; // null means explicitly removed
 }
 
 function todayISO(): string {
@@ -101,12 +101,15 @@ export function AddExpenseForm({
   const [date, setDate] = useState(defaultValues?.date ?? todayISO());
   const [notes, setNotes] = useState(defaultValues?.notes ?? "");
   const [supplier, setSupplier] = useState(defaultValues?.supplier ?? "");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     defaultValues?.photoUrl ?? null
   );
-  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(
-    defaultValues?.photoUrl ?? null
+  // null = explicitly removed, undefined = untouched, string = existing URL or new storageId
+  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null | undefined>(
+    defaultValues?.photoUrl ?? undefined
   );
+  const [photoRemoved, setPhotoRemoved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [addAnother, setAddAnother] = useState(false);
@@ -128,35 +131,17 @@ export function AddExpenseForm({
     return errs;
   }, [category, amount, date]);
 
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file");
       return;
     }
+    setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
-    setUploading(true);
-    try {
-      const uploadUrl = await generateUploadUrl();
-      const res = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!res.ok) {
-        throw new Error(`Upload failed with status ${res.status}`);
-      }
-      const { storageId } = await res.json();
-      setUploadedPhotoUrl(storageId); // store storageId temporarily
-      toast.success("Photo ready to attach");
-    } catch (err) {
-      console.error("Photo upload error:", err);
-      toast.error("Photo upload failed");
-      setPhotoPreview(null);
-    } finally {
-      setUploading(false);
-    }
+    setPhotoRemoved(false);
+    setUploadedPhotoUrl(undefined); // will be set at submit time
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -172,6 +157,30 @@ export function AddExpenseForm({
     const num = parseFloat(amount.replace(/,/g, ""));
 
     try {
+      // Upload photo at submit time if a new file was selected
+      let finalPhotoUrl: string | null | undefined = uploadedPhotoUrl;
+      if (photoFile) {
+        setUploading(true);
+        try {
+          const uploadUrl = await generateUploadUrl();
+          const res = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": photoFile.type },
+            body: photoFile,
+          });
+          if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+          const { storageId } = await res.json();
+          finalPhotoUrl = storageId;
+        } catch (err) {
+          toast.error("Photo upload failed — saving expense without photo");
+          finalPhotoUrl = undefined;
+        } finally {
+          setUploading(false);
+        }
+      } else if (photoRemoved) {
+        finalPhotoUrl = null; // explicitly removed
+      }
+
       if (externalSubmit) {
         await externalSubmit({
           category: category as ExpenseCategory,
@@ -179,7 +188,7 @@ export function AddExpenseForm({
           date,
           notes: notes || undefined,
           supplier: supplier || undefined,
-          photoUrl: uploadedPhotoUrl ?? undefined,
+          photoUrl: finalPhotoUrl,
         });
       } else {
         const expenseId = await createExpense({
@@ -191,11 +200,11 @@ export function AddExpenseForm({
           supplier: supplier || undefined,
         });
 
-        // Attach photo if uploaded
-        if (uploadedPhotoUrl && typeof uploadedPhotoUrl === "string" && !uploadedPhotoUrl.startsWith("http")) {
+        // Attach photo if a new storageId was generated
+        if (finalPhotoUrl && !finalPhotoUrl.startsWith("http")) {
           await attachPhoto({
             expenseId,
-            storageId: uploadedPhotoUrl as Id<"_storage">,
+            storageId: finalPhotoUrl as Id<"_storage">,
           });
         }
 
@@ -203,7 +212,6 @@ export function AddExpenseForm({
       }
 
       if (addAnother) {
-        // Reset form for next entry
         setCategory("");
         setAmount("");
         setDisplayAmount("");
@@ -211,7 +219,9 @@ export function AddExpenseForm({
         setNotes("");
         setSupplier("");
         setPhotoPreview(null);
-        setUploadedPhotoUrl(null);
+        setPhotoFile(null);
+        setUploadedPhotoUrl(undefined);
+        setPhotoRemoved(false);
       } else {
         onSuccess?.();
       }
@@ -357,7 +367,9 @@ export function AddExpenseForm({
                 type="button"
                 onClick={() => {
                   setPhotoPreview(null);
-                  setUploadedPhotoUrl(null);
+                  setPhotoFile(null);
+                  setUploadedPhotoUrl(undefined);
+                  setPhotoRemoved(true);
                 }}
                 className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow z-10"
               >
